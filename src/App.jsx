@@ -33,6 +33,7 @@ export default function App() {
   const [avatarSize, setAvatarSize] = useState(18)
   const [avatarPosition, setAvatarPosition] = useState('left')
   const [isSpeaking, setIsSpeaking] = useState(false)
+  const [mouthOpen, setMouthOpen] = useState(false)
   const [voiceEnabled, setVoiceEnabled] = useState(true)
   const [engineStatus, setEngineStatus] = useState('Comprobando motor local…')
   const [engineReady, setEngineReady] = useState(false)
@@ -124,22 +125,30 @@ export default function App() {
     if (!voiceEnabled) { setStatus('Activa primero la voz de NINA.'); return }
     if (!('speechSynthesis' in window)) { setStatus('Este navegador no ofrece voz sintética.'); return }
     window.speechSynthesis.cancel()
-    const phrase = character.gender === 'Mujer'
+    const voices = window.speechSynthesis.getVoices()
+    const spanishVoices = voices.filter(v => /^es(-|_)/i.test(v.lang))
+    const femaleName = /helena|sabina|monica|mónica|laura|lucia|lucía|dalia|paulina|elena|female|woman|mujer|aria|jenny|zira/i
+    const maleName = /pablo|jorge|raul|raúl|diego|antonio|carlos|juan|miguel|male|man|hombre|david|enrique|alfonso/i
+    const isFemale = character.gender === 'Mujer'
+    const preferred = spanishVoices.find(v => (isFemale ? femaleName : maleName).test(v.name))
+    if (!preferred) {
+      setStatus(`No encontré una voz española claramente ${isFemale ? 'femenina' : 'masculina'} en este navegador. No usaré una voz del género equivocado.`)
+      return
+    }
+    const phrase = isFemale
       ? `¡Hola! Soy ${character.name}. Qué bueno tenerte por aquí. Vamos a disfrutar este contenido juntos.`
       : `¡Hola! Soy ${character.name}. Qué bueno tenerte por aquí. Vamos a comentar este contenido juntos.`
     const utterance = new SpeechSynthesisUtterance(phrase)
-    const voices = window.speechSynthesis.getVoices()
-    const spanishVoices = voices.filter(v => /^es(-|_)/i.test(v.lang))
-    const preferred = spanishVoices.find(v => /DO|Dominican|República Dominicana/i.test(`${v.lang} ${v.name}`))
-      || spanishVoices.find(v => /es-US|es-MX|es-419/i.test(v.lang))
-      || spanishVoices[0]
-    if (preferred) utterance.voice = preferred
-    utterance.lang = preferred?.lang || 'es-DO'
-    utterance.rate = character.gender === 'Mujer' ? 0.96 : 0.94
-    utterance.pitch = character.gender === 'Mujer' ? 1.08 : 0.91
-    utterance.onstart = () => { setIsSpeaking(true); setStatus(`${character.name} está hablando`) }
-    utterance.onend = () => { setIsSpeaking(false); setStatus(`Prueba de voz terminada · ${character.name}`) }
-    utterance.onerror = () => { setIsSpeaking(false); setStatus('No se pudo reproducir la voz en este navegador.') }
+    utterance.voice = preferred
+    utterance.lang = preferred.lang
+    utterance.rate = isFemale ? 0.96 : 0.94
+    utterance.pitch = 1
+    utterance.onstart = () => { setIsSpeaking(true); setMouthOpen(false); setStatus(`${character.name} está hablando con voz ${isFemale ? 'femenina' : 'masculina'}`) }
+    utterance.onboundary = (event) => {
+      if (event.name === 'word') setMouthOpen(v => !v)
+    }
+    utterance.onend = () => { setIsSpeaking(false); setMouthOpen(false); setStatus(`Prueba de voz terminada · ${character.name}`) }
+    utterance.onerror = () => { setIsSpeaking(false); setMouthOpen(false); setStatus('No se pudo reproducir la voz seleccionada en este navegador.') }
     window.speechSynthesis.speak(utterance)
   }
 
@@ -160,7 +169,7 @@ export default function App() {
             <div className="section-heading"><div><span className="step-number">01</span><div><h2>Tu vídeo</h2><p>Sube un vídeo desde tu computadora</p></div></div><button className="secondary-button" onClick={() => fileRef.current?.click()}><Upload size={16} /> Subir vídeo</button><input ref={fileRef} type="file" accept="video/*" hidden onChange={e => loadVideo(e.target.files?.[0])} /></div>
             <div className="video-stage">
               {videoUrl ? <video ref={videoRef} src={videoUrl} muted={muted} onPlay={() => setPlaying(true)} onPause={() => setPlaying(false)} controls={false} playsInline /> : <button className="empty-upload" onClick={() => fileRef.current?.click()}><span className="upload-icon"><Upload size={25} /></span><strong>Arrastra tu vídeo aquí</strong><span>o pulsa para buscarlo en tu PC</span><small>MP4 · WebM · MOV</small></button>}
-              {videoUrl && avatarVisible && <div className={`avatar-overlay ${avatarPosition} ${isSpeaking ? 'speaking' : ''}`} style={{'--avatar-size': `${avatarSize}%`, '--skin': character.skin, '--hair': character.hair, '--outfit': OUTFIT_COLORS[outfit] || character.outfit}}><div className="avatar-real"><img src={character.image} alt={character.name} /></div><span className="avatar-label">{character.name.toUpperCase()} <i>•</i> {outfit}</span></div>}
+              {videoUrl && avatarVisible && <div className={`avatar-overlay ${avatarPosition} ${isSpeaking ? 'speaking' : ''} ${mouthOpen ? 'mouth-open' : ''}`} style={{'--avatar-size': `${avatarSize}%`, '--skin': character.skin, '--hair': character.hair, '--outfit': OUTFIT_COLORS[outfit] || character.outfit}}><div className="avatar-real"><img src={character.image} alt={character.name} /></div><span className="avatar-label">{character.name.toUpperCase()} <i>•</i> {outfit}</span></div>}
               {videoUrl && <div className="video-controls"><button onClick={togglePlay} aria-label={playing ? 'Pausar' : 'Reproducir'}>{playing ? <Pause size={19} /> : <Play size={19} />}</button><span>{videoName}</span></div>}
             </div>
             <div className="video-tools"><button className="tool-button" onClick={() => setAvatarVisible(v => !v)}><Move size={16} /> {avatarVisible ? 'Ocultar personaje' : 'Mostrar personaje'}</button><button className="tool-button" onClick={() => setAvatarPosition(p => p === 'right' ? 'left' : 'right')}>⇄ Cambiar lado</button><button className="tool-button" onClick={() => setMuted(v => !v)}>{muted ? <VolumeX size={16} /> : <Volume2 size={16} />} {muted ? 'Activar sonido' : 'Silenciar vista'}</button><div className="size-control"><span>Tamaño</span><input type="range" min="10" max="30" value={avatarSize} onChange={e => setAvatarSize(Number(e.target.value))} /></div></div>
