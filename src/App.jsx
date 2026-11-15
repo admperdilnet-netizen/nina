@@ -45,11 +45,12 @@ export default function App() {
   const [didConfigs, setDidConfigs] = useState(() => { try { return JSON.parse(localStorage.getItem('nina-did-agents') || '{}') } catch { return {} } })
   const [didAgentId, setDidAgentId] = useState('')
   const [didClientKey, setDidClientKey] = useState('')
-  const [didText, setDidText] = useState('¡Hola! Soy ' + (CHARACTERS.find(c => c.id === characterId)?.name || 'NINA') + '. Bienvenidos a NINA.')
+  const [didText, setDidText] = useState('¡Hola! Soy Luna. Bienvenidos a NINA.')
   const [didConnected, setDidConnected] = useState(false)
   const [didBusy, setDidBusy] = useState(false)
   const didManagerRef = useRef(null)
   const didVideoRef = useRef(null)
+  const didStreamRef = useRef(null)
   const [characterId, setCharacterId] = useState('luna')
   const [outfit, setOutfit] = useState('Glamour')
   const [hairStyle, setHairStyle] = useState('Largo ondulado')
@@ -113,6 +114,12 @@ export default function App() {
   useEffect(() => { localStorage.setItem('nina-favorites', JSON.stringify(favoriteIds)) }, [favoriteIds])
   useEffect(() => { localStorage.setItem('nina-did-agents', JSON.stringify(didConfigs)) }, [didConfigs])
   useEffect(() => {
+    if (didConnected && didVideoRef.current && didStreamRef.current) {
+      didVideoRef.current.srcObject = didStreamRef.current
+      didVideoRef.current.play().catch(() => {})
+    }
+  }, [didConnected])
+  useEffect(() => {
     const saved = didConfigs[characterId] || {}
     setDidAgentId(saved.agentId || '')
     setDidClientKey(saved.clientKey || '')
@@ -150,22 +157,35 @@ export default function App() {
     setStatus('Conectando el presentador D-ID de ' + character.name + '…')
     try {
       const sdk = await import('@d-id/client-sdk')
-      const manager = await sdk.createAgentManager(didAgentId.trim(), {
-        auth: { type: 'key', clientKey: didClientKey.trim() },
-        callbacks: {
-          onSrcObjectReady: stream => {
-            if (didVideoRef.current) {
-              didVideoRef.current.srcObject = stream
-              didVideoRef.current.play().catch(() => {})
-            }
-            setDidConnected(true)
-            setStatus('Presentador D-ID conectado: ' + character.name)
-          },
-          onError: error => {
-            console.error('D-ID session error:', error)
-            setStatus('D-ID informó un error de conexión. Revisa el agente y los dominios autorizados.')
-          },
+      let manager = null
+      const callbacks = {
+        onSrcObjectReady: stream => {
+          didStreamRef.current = stream
+          setDidConnected(true)
+          setStatus('Presentador D-ID conectado: ' + character.name)
         },
+        onVideoStateChange: state => {
+          const speaking = state === 'START'
+          setIsSpeaking(speaking)
+          if (didVideoRef.current) {
+            if (speaking && didStreamRef.current) {
+              didVideoRef.current.src = ''
+              didVideoRef.current.srcObject = didStreamRef.current
+              didVideoRef.current.play().catch(() => {})
+            } else if (!speaking) {
+              didVideoRef.current.srcObject = null
+              didVideoRef.current.src = manager?.agent?.idle_video || ''
+            }
+          }
+        },
+        onError: error => {
+          console.error('D-ID session error:', error)
+          setStatus('D-ID informó un error de conexión. Revisa el agente y los dominios autorizados.')
+        },
+      }
+      manager = await sdk.createAgentManager(didAgentId.trim(), {
+        auth: { type: 'key', clientKey: didClientKey.trim() },
+        callbacks,
       })
       didManagerRef.current = manager
       await manager.connect()
@@ -174,6 +194,9 @@ export default function App() {
       return manager
     } catch (error) {
       console.error('D-ID connection failed:', error)
+      if (didManagerRef.current) Promise.resolve(didManagerRef.current.disconnect()).catch(() => {})
+      didManagerRef.current = null
+      didStreamRef.current = null
       setDidConnected(false)
       setStatus('No se pudo conectar con D-ID. Comprueba Agent ID, Client Key, créditos y dominio autorizado.')
       return null
@@ -206,7 +229,9 @@ export default function App() {
     if (manager) Promise.resolve(manager.disconnect()).catch(() => {})
     if (didVideoRef.current) {
       didVideoRef.current.srcObject = null
+      didVideoRef.current.removeAttribute('src')
     }
+    didStreamRef.current = null
     setDidConnected(false)
     setIsSpeaking(false)
     setStatus('Presentador D-ID desconectado.')
