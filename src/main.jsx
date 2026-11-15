@@ -45,7 +45,8 @@ function InstallPrompt() {
   )
 }
 
-if ('serviceWorker' in navigator) {
+const isNativeApp = Boolean(window.Capacitor?.isNativePlatform?.())
+if (!isNativeApp && 'serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('/nina/sw.js').catch(error => console.warn('NINA offline shell:', error))
   })
