@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Clapperboard, Mic2, Play, Pause, Upload, Volume2, VolumeX, Sparkles, Settings2, MessageCircle, Captions, Move, Download, Radio, WandSparkles, UserRound, Users, Shirt, Scissors } from 'lucide-react'
+import { Clapperboard, Mic2, Play, Pause, Upload, Volume2, VolumeX, Sparkles, Settings2, MessageCircle, Captions, Move, Download, Radio, WandSparkles, UserRound, Users, Shirt, Scissors, Star } from 'lucide-react'
 
 const MODES = [
   { id: 'commentator', name: 'Comentarista automático', detail: 'Hace comentarios breves sobre el vídeo completo.', icon: MessageCircle },
@@ -39,6 +39,7 @@ export default function App() {
   const [localVideoId, setLocalVideoId] = useState('')
   const [status, setStatus] = useState('Lista para comenzar')
   const [genderFilter, setGenderFilter] = useState('Todos')
+  const [favoriteIds, setFavoriteIds] = useState(() => { try { return JSON.parse(localStorage.getItem('nina-favorites') || '[]') } catch { return [] } })
   const [characterId, setCharacterId] = useState('luna')
   const [outfit, setOutfit] = useState('Glamour')
   const [hairStyle, setHairStyle] = useState('Largo ondulado')
@@ -99,6 +100,10 @@ export default function App() {
     }
   }
 
+  useEffect(() => { localStorage.setItem('nina-favorites', JSON.stringify(favoriteIds)) }, [favoriteIds])
+
+  function toggleFavorite(id) { setFavoriteIds(ids => ids.includes(id) ? ids.filter(x => x !== id) : [...ids, id]) }
+
   function chooseCharacter(c) {
     setCharacterId(c.id)
     setOutfit(c.style)
@@ -136,8 +141,8 @@ export default function App() {
             {videoUrl && <div className="file-loaded"><span className="file-check">✓</span><span>{videoName}</span><button onClick={() => { setVideoUrl(''); setVideoName(''); setPlaying(false) }}>Quitar</button></div>}
             <section className="panel character-panel">
               <div className="panel-heading"><div><span className="step-number">02</span><div><h2>Elige tu personaje</h2><p>12 personajes iniciales: mujeres y hombres</p></div></div><Users size={19} /></div>
-              <div className="gender-filter">{['Todos','Mujer','Hombre'].map(g => <button key={g} className={genderFilter===g?'active':''} onClick={()=>setGenderFilter(g)}>{g==='Todos'?'Todos':g==='Mujer'?'Mujeres':'Hombres'}</button>)}</div>
-              <div className="character-grid">{CHARACTERS.filter(c=>genderFilter==='Todos'||c.gender===genderFilter).map(c=><button key={c.id} className={`character-card ${characterId===c.id?'chosen':''}`} onClick={()=>chooseCharacter(c)} aria-pressed={characterId===c.id}><span className="character-portrait" style={{'--skin':c.skin,'--hair':c.hair,'--outfit':c.outfit}}><i className="portrait-hair"/><i className="portrait-face"/><i className="portrait-body"/></span><strong>{c.name}</strong><small>{c.role}</small><small className="character-style">{c.style}</small></button>)}</div><div className="selected-character-info"><div><strong>{character.name}</strong><span>{character.role}</span></div><p>{character.personality}. {character.look}.</p><small>Voz asignada: {character.voice}</small></div>
+              <div className="gender-filter">{['Todos','Mujer','Hombre','Favoritos'].map(g => <button key={g} className={genderFilter===g?'active':''} onClick={()=>setGenderFilter(g)}>{g==='Todos'?'Todos':g==='Mujer'?'Mujeres':g==='Hombre'?'Hombres':'★ Favoritos'}</button>)}</div>
+              <div className="character-grid">{CHARACTERS.filter(c=>genderFilter==='Todos'||(genderFilter==='Favoritos'?favoriteIds.includes(c.id):c.gender===genderFilter)).map(c=><div className="character-card-wrap" key={c.id}><button className={`character-card ${characterId===c.id?'chosen':''}`} onClick={()=>chooseCharacter(c)} aria-pressed={characterId===c.id}><span className="character-portrait" style={{'--skin':c.skin,'--hair':c.hair,'--outfit':c.outfit}}><i className="portrait-hair"/><i className="portrait-face"/><i className="portrait-body"/></span><strong>{c.name}</strong><small>{c.role}</small><small className="character-style">{c.style}</small></button><button className={`favorite-button ${favoriteIds.includes(c.id)?'is-favorite':''}`} aria-label="Alternar favorito" onClick={()=>toggleFavorite(c.id)}><Star size={13}/></button></div>)}</div><div className="selected-character-info"><div><strong>{character.name}</strong><span>{character.role}</span></div><p>{character.personality}. {character.look}.</p><small>Voz asignada: {character.voice}</small></div>
               <div className="customize-row"><label><span><Shirt size={14}/> Vestimenta</span><select value={outfit} onChange={e=>setOutfit(e.target.value)}>{OUTFITS.map(x=><option key={x}>{x}</option>)}</select></label><label><span><Scissors size={14}/> Corte / peinado</span><select value={hairStyle} onChange={e=>setHairStyle(e.target.value)}>{HAIR_STYLES.map(x=><option key={x}>{x}</option>)}</select></label></div>
               <p className="microcopy">Esta biblioteca es la primera selección visual. La personalización avanzada de ropa y cabello se ampliará con modelos animados reales.</p>
             </section>
