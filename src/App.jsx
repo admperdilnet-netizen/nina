@@ -55,7 +55,7 @@ export default function App() {
       .then(r => { if (!r.ok) throw new Error('offline'); return r.json() })
       .then(data => {
         setEngineReady(true)
-        setEngineStatus(data.ffmpeg_ready ? 'Motor local conectado · FFmpeg listo' : 'Motor conectado · falta FFmpeg')
+        setEngineStatus(data.ffmpeg_ready ? `Motor local conectado · perfil ${data.resource_profile?.recommended_profile || 'estándar'} · RAM libre ${data.resource_profile?.ram_available_gb ?? '?'} GB` : 'Motor conectado · falta FFmpeg')
       })
       .catch(() => {
         setEngineReady(false)
