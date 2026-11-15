@@ -199,16 +199,35 @@ MAX_AVATAR_IMAGE_BYTES = 15 * 1024 * 1024
 def avatar_engine_status() -> dict[str, Any]:
     inference = SADTALKER_DIR / "inference.py"
     python_path = SADTALKER_PYTHON or sys.executable
-    female_ready = bool(PIPER_FEMALE_MODEL and Path(PIPER_PYTHON).is_file() and Path(PIPER_FEMALE_MODEL).is_file())
-    male_ready = bool(PIPER_MALE_MODEL and Path(PIPER_PYTHON).is_file() and Path(PIPER_MALE_MODEL).is_file())
+    checkpoints_dir = SADTALKER_DIR / "checkpoints"
+    checkpoints_ready = checkpoints_dir.is_dir() and any(checkpoints_dir.iterdir())
+    piper_python_ready = Path(PIPER_PYTHON).is_file()
+    try:
+        piper_check = subprocess.run(
+            [PIPER_PYTHON, "-m", "piper", "--help"],
+            capture_output=True,
+            text=True,
+            timeout=8,
+            check=False,
+        ) if piper_python_ready else None
+        piper_ready = bool(piper_check and piper_check.returncode == 0)
+    except (OSError, subprocess.TimeoutExpired):
+        piper_ready = False
+    female_model = Path(PIPER_FEMALE_MODEL) if PIPER_FEMALE_MODEL else None
+    male_model = Path(PIPER_MALE_MODEL) if PIPER_MALE_MODEL else None
+    female_ready = bool(piper_ready and female_model and female_model.is_file() and female_model.with_suffix(female_model.suffix + ".json").is_file())
+    male_ready = bool(piper_ready and male_model and male_model.is_file() and male_model.with_suffix(male_model.suffix + ".json").is_file())
+    sadtalker_ready = inference.is_file() and checkpoints_ready and Path(python_path).is_file()
+    available = sadtalker_ready and piper_ready and female_ready and male_ready
     return {
-        "available": inference.is_file() and Path(python_path).is_file() and female_ready and male_ready,
-        "sadtalker_ready": inference.is_file(),
-        "piper_ready": Path(PIPER_PYTHON).is_file(),
+        "available": available,
+        "sadtalker_ready": sadtalker_ready,
+        "checkpoints_ready": checkpoints_ready,
+        "piper_ready": piper_ready,
         "female_voice_ready": female_ready,
         "male_voice_ready": male_ready,
         "sadtalker_dir": str(SADTALKER_DIR),
-        "message": "Motor local listo." if inference.is_file() and Path(python_path).is_file() and female_ready and male_ready else "Falta instalar/configurar SadTalker, Piper o sus modelos de voz. D-ID sigue intacto.",
+        "message": "Motor local listo." if available else "Falta instalar/configurar SadTalker, sus checkpoints, Piper o los dos modelos de voz (.onnx + .onnx.json). D-ID sigue intacto.",
     }
 
 
