@@ -167,18 +167,21 @@ export default function App() {
 
   useEffect(() => { localStorage.setItem('nina-favorites', JSON.stringify(favoriteIds)) }, [favoriteIds])
   useEffect(() => { localStorage.setItem('nina-did-agents', JSON.stringify(didConfigs)) }, [didConfigs])
-  useEffect(() => {
-    fetch('http://127.0.0.1:8765/avatar/status')
-      .then(r => r.json())
-      .then(data => {
-        setLocalAvatarReady(Boolean(data.available))
-        setLocalAvatarStatus(data.message || (data.available ? 'Motor gratuito listo.' : 'Falta instalar SadTalker, Piper y las voces.'))
-      })
-      .catch(() => {
-        setLocalAvatarReady(false)
-        setLocalAvatarStatus('Inicia NINA Local Engine en tu PC para comprobar el motor gratuito.')
-      })
-  }, [])
+  async function checkLocalAvatar() {
+    setLocalAvatarStatus('Comprobando SadTalker, Piper y modelos de voz…')
+    try {
+      const response = await fetch('http://127.0.0.1:8765/avatar/status')
+      if (!response.ok) throw new Error('No se pudo consultar el motor local.')
+      const data = await response.json()
+      setLocalAvatarReady(Boolean(data.available))
+      setLocalAvatarStatus(data.message || (data.available ? 'Motor gratuito listo.' : 'Falta instalar SadTalker, Piper y las voces.'))
+    } catch {
+      setLocalAvatarReady(false)
+      setLocalAvatarStatus('Inicia NINA Local Engine en tu PC y vuelve a comprobar.')
+    }
+  }
+
+  useEffect(() => { checkLocalAvatar() }, [])
 
   useEffect(() => {
     if (didConnected && didVideoRef.current && didStreamRef.current) {
@@ -207,6 +210,7 @@ export default function App() {
     setCharacterId(c.id)
     setOutfit(c.style)
     setHairStyle(c.hairStyles[0])
+    setLocalAvatarVideoUrl('')
     setStatus(`Personaje seleccionado: ${c.name}`)
   }
 
@@ -486,11 +490,11 @@ export default function App() {
             <section className="panel mode-panel"><div className="panel-heading"><div><span className="step-number">03</span><div><h2>Modo de actuación</h2><p>¿Cómo quieres que participe?</p></div></div><Settings2 size={18}/></div><div className="mode-list">{MODES.map(({id,name,detail,icon:Icon})=><button key={id} className={`mode-option ${mode===id?'selected':''}`} onClick={()=>{setMode(id);setStatus(`Modo seleccionado: ${name}`)}}><span className="mode-icon"><Icon size={18}/></span><span className="mode-text"><strong>{name}</strong><small>{detail}</small></span><span className="radio-mark">{mode===id?'✓':''}</span></button>)}</div></section>
             <section className="panel voice-panel">
               <div className="panel-heading"><div><span className="step-number">04</span><div><h2>Comentarios automáticos</h2><p>Un solo vídeo completo · sin recortes</p></div></div><Mic2 size={19}/></div>
-              <div className="voice-card"><div className="voice-orb"><Mic2 size={20}/></div><div className="voice-copy"><strong>Voz de {character.name}</strong><small>{character.gender === 'Mujer' ? 'Voz femenina' : 'Voz masculina'} · voz y labios sincronizados mediante D-ID</small></div><button className="test-voice-button" onClick={speakWithDid} disabled={didBusy || isSpeaking}>{didBusy ? 'CONECTANDO…' : isSpeaking ? 'HABLANDO…' : 'HABLAR CON D-ID'}</button></div>
+              <div className="voice-card"><div className="voice-orb"><Mic2 size={20}/></div><div className="voice-copy"><strong>Voz de {character.name}</strong><small>{character.gender === 'Mujer' ? 'Voz femenina' : 'Voz masculina'} · sincronización con D-ID o motor local</small></div><button className="test-voice-button" onClick={speakWithDid} disabled={didBusy || isSpeaking}>{didBusy ? 'CONECTANDO…' : isSpeaking ? 'HABLANDO…' : 'HABLAR CON D-ID'}</button></div>
               <label className="comment-frequency"><span>Frecuencia de comentarios</span><strong>Cada {commentInterval} segundos</strong><input type="range" min="20" max="180" step="10" value={commentInterval} onChange={e=>setCommentInterval(Number(e.target.value))}/></label>
                 <div className="local-avatar-setup">
                   <div className="did-heading"><strong>Presentador gratuito en tu PC</strong><span>{localAvatarReady ? 'MOTOR LISTO' : 'CONFIGURACIÓN PENDIENTE'}</span></div>
-                  <p className="did-live-status" role="status" aria-live="polite">{localAvatarStatus}</p>
+                  <p className="did-live-status" role="status" aria-live="polite">{localAvatarStatus}</p><button className="tool-button" onClick={checkLocalAvatar}>Actualizar estado del motor</button>
                   <label>Texto que dirá {character.name}<textarea rows="3" value={didText} onChange={e=>setDidText(e.target.value)} placeholder="Escribe lo que debe decir el personaje…" /></label>
                   <button className="local-avatar-button" onClick={generateLocalAvatar} disabled={localAvatarBusy || !localAvatarReady}>{localAvatarBusy ? 'GENERANDO EN TU PC…' : 'GENERAR PRESENTADOR GRATIS'}</button>
                   {localAvatarVideoUrl && <div className="local-avatar-result"><a href={localAvatarVideoUrl} target="_blank" rel="noreferrer">Abrir vídeo generado</a><button className="tool-button" onClick={() => setLocalAvatarVideoUrl('')}>Cerrar vista previa</button></div>}
@@ -517,7 +521,7 @@ export default function App() {
             <section className="panel export-panel"><div className="panel-heading"><div><span className="step-number">05</span><div><h2>Vídeo final para YouTube</h2><p>Vídeo completo con personaje y comentarios</p></div></div><Download size={18}/></div><div className="export-preview"><div className="checker"><span className="mini-avatar">N</span></div><div><strong>WebM transparente</strong><small>También estudiaremos MOV ProRes 4444</small></div></div><button className="export-button" disabled><Download size={16}/> Exportación aún no conectada</button><p className="microcopy">{engineStatus}{localVideoId ? ' · archivo recibido localmente' : ''}</p></section>
           </aside>
         </div>
-        <footer className="footer-note"><span>✦</span> Los retratos son una vista previa. Para que cada personaje hable con labios sincronizados, parpadeo y movimientos reales, conecta su Agent de D-ID.</footer>
+        <footer className="footer-note"><span>✦</span> Los retratos son una vista previa. Puedes animarlos con D-ID o con el motor gratuito instalado en tu PC.</footer>
       </main>
     </div>
   )
