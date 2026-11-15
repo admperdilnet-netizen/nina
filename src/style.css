@@ -7,3 +7,55 @@
 .comment-frequency{display:flex;flex-direction:column;gap:9px;margin-top:13px;color:#dcd6e7;font-size:10px}
 .comment-frequency strong{color:#c7adff;font-size:11px}
 .comment-frequency input{width:100%;accent-color:#b99aff}
+
+/* Mobile and tablet app layout */
+html{min-height:100%;background:#100f18;overscroll-behavior-y:contain}
+body{padding-bottom:env(safe-area-inset-bottom);-webkit-tap-highlight-color:transparent}
+button,.secondary-button,.tool-button,.character-card,.empty-upload{touch-action:manipulation}
+button{min-height:40px}
+.install-prompt{position:fixed;z-index:1000;left:16px;right:16px;bottom:calc(14px + env(safe-area-inset-bottom));max-width:620px;margin:auto;display:flex;align-items:center;gap:12px;padding:13px 14px;border:1px solid rgba(196,166,255,.35);border-radius:15px;background:rgba(28,25,39,.97);box-shadow:0 14px 45px #0008;backdrop-filter:blur(18px)}
+.install-prompt>div{display:flex;flex-direction:column;gap:4px;flex:1;min-width:0}
+.install-prompt strong{font-size:12px;color:#fff}
+.install-prompt small,.install-hint{font-size:10px;line-height:1.4;color:#aaa2b9}
+.install-prompt button{display:flex;align-items:center;justify-content:center;gap:6px;border:0;border-radius:9px;background:linear-gradient(100deg,#b79aff,#dfacd8);color:#1d1628;padding:9px 12px;font-weight:750;font-size:11px;white-space:nowrap}
+.install-prompt .install-close{background:transparent;color:#aaa2b9;padding:5px;min-width:32px}
+.install-hint{max-width:150px}
+@media(min-width:601px) and (max-width:1024px){
+ .workspace{padding:28px 24px 36px}
+ .studio-grid{grid-template-columns:minmax(0,1fr) minmax(280px,.78fr);gap:16px}
+ .side-column{display:flex}
+ .character-grid{grid-template-columns:repeat(3,minmax(0,1fr))}
+ .panel{padding:14px}
+ .intro h1{font-size:40px}
+}
+@media(max-width:600px){
+ .topbar{height:58px;padding-left:15px;padding-right:15px}
+ .brand{font-size:17px}
+ .workspace{padding:20px 13px calc(34px + env(safe-area-inset-bottom))}
+ .intro{margin-bottom:19px}
+ .intro h1{font-size:34px}
+ .intro-copy{font-size:12px;line-height:1.5}
+ .studio-grid{display:flex;flex-direction:column;gap:16px}
+ .video-column,.side-column{width:100%}
+ .video-stage{border-radius:13px;aspect-ratio:16/10;min-height:190px}
+ .video-controls{left:8px;right:8px;bottom:8px;padding:7px 8px}
+ .video-tools{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}
+ .tool-button{justify-content:center;min-height:42px}
+ .size-control{grid-column:1/-1}
+ .side-column{display:flex;gap:12px}
+ .panel{padding:13px;border-radius:13px}
+ .character-grid{grid-template-columns:repeat(3,minmax(0,1fr));gap:7px}
+ .character-card{min-height:105px;padding:8px 3px}
+ .character-portrait{width:48px;height:56px}
+ .customize-row{grid-template-columns:1fr 1fr}
+ .customize-row select{min-height:42px}
+ .voice-card{flex-wrap:wrap}
+ .soon-tag{margin-left:49px}
+ .section-heading h2,.panel-heading h2{font-size:13px}
+ .footer-note{font-size:10px}
+ .install-prompt{left:9px;right:9px;bottom:calc(8px + env(safe-area-inset-bottom));gap:7px;padding:10px}
+ .install-prompt strong{font-size:11px}
+ .install-prompt small{font-size:9px}
+ .install-hint{font-size:9px;max-width:105px}
+}
+@media(hover:none){.character-card:hover,.secondary-button:hover,.tool-button:hover{border-color:var(--line);background:rgba(255,255,255,.025)}}
