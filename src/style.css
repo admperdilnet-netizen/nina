@@ -81,7 +81,7 @@ button{min-height:40px}
 
 
 /* Compact presenter docked to the left, with subtle idle and speech motion */
-.avatar-overlay{max-width:150px;bottom:52px;transform-origin:50% 90%;animation:presenter-idle 5s ease-in-out infinite}
+.avatar-overlay{max-width:120px;bottom:52px;transform-origin:50% 90%;animation:presenter-idle 5s ease-in-out infinite}
 .avatar-overlay.left{left:2.2%;right:auto}
 .avatar-overlay.right{right:2.2%;left:auto}
 .avatar-real{border-radius:48% 48% 12% 12%;transform-origin:50% 85%}
@@ -93,7 +93,7 @@ button{min-height:40px}
 @keyframes presenter-mouth{from{height:2px;width:7px;transform:translateX(-50%) scaleY(.7)}to{height:8px;width:10px;transform:translateX(-50%) scaleY(1)}}
 .test-voice-button{border:1px solid rgba(185,154,255,.4);border-radius:8px;background:rgba(167,139,250,.16);color:#d9c8ff;padding:9px 10px;font-size:8px;font-weight:800;letter-spacing:.06em;cursor:pointer;white-space:nowrap}
 .test-voice-button:disabled{opacity:.55;cursor:default}
-@media(max-width:600px){.avatar-overlay{max-width:112px;bottom:43px}.avatar-overlay.left{left:2%}.test-voice-button{margin-left:48px}}
+@media(max-width:600px){.avatar-overlay{max-width:94px;bottom:43px}.avatar-overlay.left{left:2%}.test-voice-button{margin-left:48px}}
 @media(prefers-reduced-motion:reduce){.avatar-overlay,.avatar-overlay.speaking .avatar-real:before{animation:none!important}}
 
 
@@ -106,3 +106,14 @@ button{min-height:40px}
 .avatar-overlay.mouth-open .avatar-real:before{height:8px;width:12px;border-radius:45% 45% 60% 60%;background:#54202a}
 @keyframes presenter-image-idle{0%,100%{transform:translateY(0) scale(1)}50%{transform:translateY(-2px) scale(1.008)}}
 @keyframes presenter-image-talk{0%,100%{transform:translateY(0) rotate(0)}25%{transform:translateY(-1px) rotate(-.4deg)}75%{transform:translateY(1px) rotate(.4deg)}}
+
+
+/* NINA presenter: compact framing and restrained upper-body motion */
+.avatar-overlay{max-width:120px;}
+.avatar-overlay .avatar-real{transform-origin:50% 92%;}
+.avatar-overlay.speaking .avatar-real{animation:presenter-body-talk .62s ease-in-out infinite;}
+.avatar-overlay:not(.speaking) .avatar-real{animation:presenter-breathe 4s ease-in-out infinite;}
+.avatar-real:before{top:47%;}
+@keyframes presenter-body-talk{0%,100%{transform:translateY(0) rotate(0)}35%{transform:translateY(-2px) rotate(-.7deg)}70%{transform:translateY(1px) rotate(.6deg)}}
+@keyframes presenter-breathe{0%,100%{transform:translateY(0) scale(1)}50%{transform:translateY(-1px) scale(1.006)}}
+@media(max-width:600px){.avatar-overlay{max-width:94px;}}
