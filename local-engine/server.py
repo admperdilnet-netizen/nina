@@ -10,6 +10,7 @@ from typing import Any
 import imageio_ffmpeg
 from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.middleware.base import BaseHTTPMiddleware
 from fastapi.responses import FileResponse
 
 APP_DIR = Path(__file__).resolve().parent
@@ -21,11 +22,17 @@ VIDEO_TYPES = {"video/mp4", "video/webm", "video/quicktime", "video/x-matroska"}
 app = FastAPI(title="NINA Local Video Engine", version="0.1.0")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["https://admperdilnet-netizen.github.io", "http://127.0.0.1:5173", "http://localhost:5173"],
     allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+@app.middleware("http")
+async def allow_local_network_access(request, call_next):
+    response = await call_next(request)
+    response.headers["Access-Control-Allow-Private-Network"] = "true"
+    return response
 
 def ffmpeg_path() -> str:
     try:
