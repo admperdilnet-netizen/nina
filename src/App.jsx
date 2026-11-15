@@ -214,9 +214,12 @@ export default function App() {
       didStreamRef.current = null
     }
     setDidBusy(true)
-    setStatus('Conectando el presentador D-ID de ' + character.name + '…')
+    setStatus('Iniciando D-ID para ' + character.name + '…')
     try {
+      setStatus('Cargando el módulo oficial de D-ID…')
       const sdk = await import('@d-id/client-sdk')
+      if (typeof sdk.createAgentManager !== 'function') throw new Error('El módulo D-ID se cargó, pero no expone createAgentManager. Recarga NINA con Ctrl+F5.')
+      setStatus('Módulo D-ID cargado · validando Agent y Client Key…')
       let manager = null
       let streamType = null
       const callbacks = {
@@ -273,6 +276,7 @@ export default function App() {
       didManagerRef.current = manager
       const configuredAvatarType = manager.agent?.avatar?.type || 'unknown'
       setDidAvatarType(configuredAvatarType)
+      setStatus('Agent validado · abriendo conexión de vídeo con D-ID…')
       await manager.connect()
       streamType = manager.getStreamType?.() || null
       if (didVideoRef.current && didStreamRef.current) {
@@ -310,6 +314,7 @@ export default function App() {
   async function speakWithDid() {
     if (!didText.trim()) { setStatus('Escribe el texto que debe decir ' + character.name + '.'); return }
     setDidBusy(true)
+    setStatus('Preparando la conexión de voz de ' + character.name + '…')
     try {
       let manager = didManagerRef.current
       if (!manager || manager.getConnectionState?.() !== 'connected') {
@@ -320,7 +325,7 @@ export default function App() {
         throw new Error('D-ID no confirmó la conexión de vídeo. Pulsa CONECTAR MINIATURA y revisa el estado mostrado.')
       }
       setIsSpeaking(true)
-      setStatus(character.name + ' está hablando con D-ID…')
+      setStatus('Conexión lista · enviando texto a D-ID para ' + character.name + '…')
       const result = await manager.speak({ type: 'text', input: didText.trim() })
       if (result?.videoId === '' && manager.agent?.avatar?.type !== 'expressive') {
         setStatus('D-ID aceptó el texto, pero no generó vídeo. Revisa que el agente tenga modo de vídeo activado y no esté en modo solo texto.')
@@ -436,6 +441,7 @@ export default function App() {
               <label className="comment-frequency"><span>Frecuencia de comentarios</span><strong>Cada {commentInterval} segundos</strong><input type="range" min="20" max="180" step="10" value={commentInterval} onChange={e=>setCommentInterval(Number(e.target.value))}/></label>
               <div className="did-setup">
                   <div className="did-heading"><strong>Presentador real con D-ID</strong><span>{didConnected ? 'CONECTADO' : 'CONFIGURACIÓN POR PERSONAJE'}</span></div>
+                  <p className="did-live-status" role="status" aria-live="polite">{status}</p>
                   <label>País del acento español
                     <select value={voiceCountry} onChange={e => setVoiceCountry(e.target.value)}>
                       {SPANISH_VOICE_COUNTRIES.map(country => <option key={country.code} value={country.code}>{country.name} · {country.accent}</option>)}
