@@ -71,6 +71,10 @@ export default function App() {
   const [didClientKey, setDidClientKey] = useState('')
   const [didText, setDidText] = useState('¡Hola! Soy Luna. Bienvenidos a NINA.')
   const [didConnected, setDidConnected] = useState(false)
+  const [localAvatarReady, setLocalAvatarReady] = useState(false)
+  const [localAvatarBusy, setLocalAvatarBusy] = useState(false)
+  const [localAvatarStatus, setLocalAvatarStatus] = useState('Comprueba el motor local para usar el avatar gratuito.')
+  const [localAvatarVideoUrl, setLocalAvatarVideoUrl] = useState('')
   const [didAvatarType, setDidAvatarType] = useState('')
   const [didBusy, setDidBusy] = useState(false)
   const didManagerRef = useRef(null)
@@ -163,6 +167,19 @@ export default function App() {
 
   useEffect(() => { localStorage.setItem('nina-favorites', JSON.stringify(favoriteIds)) }, [favoriteIds])
   useEffect(() => { localStorage.setItem('nina-did-agents', JSON.stringify(didConfigs)) }, [didConfigs])
+  useEffect(() => {
+    fetch('http://127.0.0.1:8765/avatar/status')
+      .then(r => r.json())
+      .then(data => {
+        setLocalAvatarReady(Boolean(data.available))
+        setLocalAvatarStatus(data.message || (data.available ? 'Motor gratuito listo.' : 'Falta instalar SadTalker, Piper y las voces.'))
+      })
+      .catch(() => {
+        setLocalAvatarReady(false)
+        setLocalAvatarStatus('Inicia NINA Local Engine en tu PC para comprobar el motor gratuito.')
+      })
+  }, [])
+
   useEffect(() => {
     if (didConnected && didVideoRef.current && didStreamRef.current) {
       didVideoRef.current.srcObject = didStreamRef.current
@@ -359,6 +376,38 @@ export default function App() {
     setStatus('Presentador D-ID desconectado.')
   }
 
+
+  async function generateLocalAvatar() {
+    if (!didText.trim()) {
+      setLocalAvatarStatus('Escribe primero el texto que debe decir ' + character.name + '.')
+      return
+    }
+    setLocalAvatarBusy(true)
+    setLocalAvatarStatus('Preparando retrato y voz local…')
+    try {
+      const portraitResponse = await fetch(character.image)
+      if (!portraitResponse.ok) throw new Error('No se pudo descargar el retrato seleccionado. Comprueba tu conexión.')
+      const portraitBlob = await portraitResponse.blob()
+      const form = new FormData()
+      form.append('image', portraitBlob, character.id + '.jpg')
+      form.append('text', didText.trim())
+      form.append('gender', character.gender === 'Mujer' ? 'female' : 'male')
+      setLocalAvatarStatus('Generando voz sin conexión y animando el rostro en tu PC. Puede tardar varios minutos…')
+      const response = await fetch('http://127.0.0.1:8765/avatar/generate', { method: 'POST', body: form })
+      const result = await response.json().catch(() => ({}))
+      if (!response.ok) throw new Error(result.detail || 'No se pudo generar el vídeo local.')
+      setLocalAvatarVideoUrl(result.video_url + '?v=' + Date.now())
+      setLocalAvatarStatus('Vídeo hablado generado en tu PC. Ya puedes reproducirlo en NINA.')
+      setStatus('Avatar gratuito generado localmente · ' + character.name)
+    } catch (error) {
+      const message = error?.message || 'Error desconocido'
+      setLocalAvatarStatus(message)
+      setStatus('Motor local: ' + message)
+    } finally {
+      setLocalAvatarBusy(false)
+    }
+  }
+
   function toggleVoice() {
     const next = !voiceEnabled
     setVoiceEnabled(next)
@@ -420,7 +469,7 @@ export default function App() {
             <div className="section-heading"><div><span className="step-number">01</span><div><h2>Tu vídeo</h2><p>Sube un vídeo desde tu computadora</p></div></div><button className="secondary-button" onClick={() => fileRef.current?.click()}><Upload size={16} /> Subir vídeo</button><input ref={fileRef} type="file" accept="video/*" hidden onChange={e => loadVideo(e.target.files?.[0])} /></div>
             <div className={`video-stage ${avatarVisible && !videoUrl ? 'presenter-visible' : ''}`}>
               {videoUrl ? <video ref={videoRef} src={videoUrl} muted={muted} onPlay={() => setPlaying(true)} onPause={() => setPlaying(false)} onLoadedMetadata={e => { const v = e.currentTarget; if (Number.isFinite(v.duration) && v.duration > 0) setStatus('Vídeo listo para reproducir · ' + Math.round(v.duration) + ' segundos'); }} onError={e => { const code = e.currentTarget.error?.code; setPlaying(false); if (code === 4 || code === 3) recoverVideoPlayback(); else setStatus('NINA no pudo leer el archivo. Comprueba que el vídeo no esté dañado y vuelve a cargarlo.'); }} controls playsInline /> : <button className="empty-upload" onClick={() => fileRef.current?.click()}><span className="upload-icon"><Upload size={25} /></span><strong>Arrastra tu vídeo aquí</strong><span>o pulsa para buscarlo en tu PC</span><small>MP4 · WebM · MOV</small></button>}
-              {avatarVisible && <div className={`avatar-overlay ${avatarPosition} ${isSpeaking ? 'speaking' : ''} ${didConnected ? 'did-live' : ''}`} style={{'--avatar-size': `${avatarSize}%`, '--skin': character.skin, '--hair': character.hair, '--outfit': OUTFIT_COLORS[outfit] || character.outfit}}>{didConnected ? <video ref={didVideoRef} className="did-avatar-video" autoPlay playsInline onLoadedMetadata={e => { const v = e.currentTarget; if (v.videoWidth && v.videoHeight && v.parentElement) v.parentElement.style.aspectRatio = `${v.videoWidth} / ${v.videoHeight}`; }} /> : <div className="avatar-real"><img src={character.image} alt={character.name} /></div>}<span className="avatar-label">{character.name.toUpperCase()} <i>•</i> {didConnected ? 'EN VIVO · D-ID' : 'CONECTA PARA ANIMAR'}</span></div>}
+              {avatarVisible && <div className={`avatar-overlay ${avatarPosition} ${isSpeaking ? 'speaking' : ''} ${didConnected || localAvatarVideoUrl ? 'did-live' : ''}`} style={{'--avatar-size': `${avatarSize}%`, '--skin': character.skin, '--hair': character.hair, '--outfit': OUTFIT_COLORS[outfit] || character.outfit}}>{localAvatarVideoUrl ? <video className="did-avatar-video" src={localAvatarVideoUrl} autoPlay loop playsInline controls /> : didConnected ? <video ref={didVideoRef} className="did-avatar-video" autoPlay playsInline onLoadedMetadata={e => { const v = e.currentTarget; if (v.videoWidth && v.videoHeight && v.parentElement) v.parentElement.style.aspectRatio = `${v.videoWidth} / ${v.videoHeight}`; }} /> : <div className="avatar-real"><img src={character.image} alt={character.name} /></div>}<span className="avatar-label">{character.name.toUpperCase()} <i>•</i> {localAvatarVideoUrl ? 'VÍDEO LOCAL' : didConnected ? 'EN VIVO · D-ID' : 'LISTA PARA ANIMAR'}</span></div>}
               {videoUrl && <div className="video-controls"><button onClick={togglePlay} aria-label={playing ? 'Pausar' : 'Reproducir'} title={playing ? 'Pausar vídeo' : 'Reproducir vídeo'}>{playing ? <Pause size={19} /> : <Play size={19} />}</button><span className="playback-hint">{playing ? 'Reproduciendo vídeo' : 'Reproducir vídeo'}</span></div>}
             </div>
             <div className="video-tools"><button className="tool-button" onClick={() => setAvatarVisible(v => !v)}><Move size={16} /> {avatarVisible ? 'Ocultar personaje' : 'Mostrar personaje'}</button><button className="tool-button" onClick={() => setAvatarPosition(p => p === 'right' ? 'left' : 'right')}>⇄ Cambiar lado</button><button className="tool-button" onClick={() => setMuted(v => !v)}>{muted ? <VolumeX size={16} /> : <Volume2 size={16} />} {muted ? 'Activar sonido' : 'Silenciar vista'}</button><div className="size-control"><span>Tamaño</span><input type="range" min="8" max="22" value={avatarSize} onChange={e => setAvatarSize(Number(e.target.value))} /></div></div>
@@ -439,6 +488,14 @@ export default function App() {
               <div className="panel-heading"><div><span className="step-number">04</span><div><h2>Comentarios automáticos</h2><p>Un solo vídeo completo · sin recortes</p></div></div><Mic2 size={19}/></div>
               <div className="voice-card"><div className="voice-orb"><Mic2 size={20}/></div><div className="voice-copy"><strong>Voz de {character.name}</strong><small>{character.gender === 'Mujer' ? 'Voz femenina' : 'Voz masculina'} · voz y labios sincronizados mediante D-ID</small></div><button className="test-voice-button" onClick={speakWithDid} disabled={didBusy || isSpeaking}>{didBusy ? 'CONECTANDO…' : isSpeaking ? 'HABLANDO…' : 'HABLAR CON D-ID'}</button></div>
               <label className="comment-frequency"><span>Frecuencia de comentarios</span><strong>Cada {commentInterval} segundos</strong><input type="range" min="20" max="180" step="10" value={commentInterval} onChange={e=>setCommentInterval(Number(e.target.value))}/></label>
+                <div className="local-avatar-setup">
+                  <div className="did-heading"><strong>Presentador gratuito en tu PC</strong><span>{localAvatarReady ? 'MOTOR LISTO' : 'CONFIGURACIÓN PENDIENTE'}</span></div>
+                  <p className="did-live-status" role="status" aria-live="polite">{localAvatarStatus}</p>
+                  <label>Texto que dirá {character.name}<textarea rows="3" value={didText} onChange={e=>setDidText(e.target.value)} placeholder="Escribe lo que debe decir el personaje…" /></label>
+                  <button className="local-avatar-button" onClick={generateLocalAvatar} disabled={localAvatarBusy || !localAvatarReady}>{localAvatarBusy ? 'GENERANDO EN TU PC…' : 'GENERAR PRESENTADOR GRATIS'}</button>
+                  {localAvatarVideoUrl && <div className="local-avatar-result"><a href={localAvatarVideoUrl} target="_blank" rel="noreferrer">Abrir vídeo generado</a><button className="tool-button" onClick={() => setLocalAvatarVideoUrl('')}>Cerrar vista previa</button></div>}
+                  <p className="microcopy">SadTalker anima el retrato y sincroniza los labios con el audio. Piper crea la voz localmente. En tu PC de 8 GB se procesará por CPU y no será en tiempo real. D-ID permanece disponible mientras comprobamos esta alternativa.</p>
+                </div>
               <div className="did-setup">
                   <div className="did-heading"><strong>Presentador real con D-ID</strong><span>{didConnected ? 'CONECTADO' : 'CONFIGURACIÓN POR PERSONAJE'}</span></div>
                   <p className="did-live-status" role="status" aria-live="polite">{status}</p>
