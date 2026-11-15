@@ -30,8 +30,9 @@ export default function App() {
   const [playing, setPlaying] = useState(false)
   const [muted, setMuted] = useState(false)
   const [avatarVisible, setAvatarVisible] = useState(true)
-  const [avatarSize, setAvatarSize] = useState(34)
-  const [avatarPosition, setAvatarPosition] = useState('right')
+  const [avatarSize, setAvatarSize] = useState(18)
+  const [avatarPosition, setAvatarPosition] = useState('left')
+  const [isSpeaking, setIsSpeaking] = useState(false)
   const [voiceEnabled, setVoiceEnabled] = useState(true)
   const [engineStatus, setEngineStatus] = useState('Comprobando motor local…')
   const [engineReady, setEngineReady] = useState(false)
@@ -114,7 +115,32 @@ export default function App() {
   function toggleVoice() {
     const next = !voiceEnabled
     setVoiceEnabled(next)
-    setStatus(next ? 'Voz de NINA: pendiente de conectar el motor de voz dominicana.' : 'Voz desactivada.')
+    if (!next && 'speechSynthesis' in window) window.speechSynthesis.cancel()
+    setIsSpeaking(false)
+    setStatus(next ? 'Voz de prueba activada en el navegador.' : 'Voz desactivada.')
+  }
+
+  function speakPresenter() {
+    if (!voiceEnabled) { setStatus('Activa primero la voz de NINA.'); return }
+    if (!('speechSynthesis' in window)) { setStatus('Este navegador no ofrece voz sintética.'); return }
+    window.speechSynthesis.cancel()
+    const phrase = character.gender === 'Mujer'
+      ? `¡Hola! Soy ${character.name}. Qué bueno tenerte por aquí. Vamos a disfrutar este contenido juntos.`
+      : `¡Hola! Soy ${character.name}. Qué bueno tenerte por aquí. Vamos a comentar este contenido juntos.`
+    const utterance = new SpeechSynthesisUtterance(phrase)
+    const voices = window.speechSynthesis.getVoices()
+    const spanishVoices = voices.filter(v => /^es(-|_)/i.test(v.lang))
+    const preferred = spanishVoices.find(v => /DO|Dominican|República Dominicana/i.test(`${v.lang} ${v.name}`))
+      || spanishVoices.find(v => /es-US|es-MX|es-419/i.test(v.lang))
+      || spanishVoices[0]
+    if (preferred) utterance.voice = preferred
+    utterance.lang = preferred?.lang || 'es-DO'
+    utterance.rate = character.gender === 'Mujer' ? 0.96 : 0.94
+    utterance.pitch = character.gender === 'Mujer' ? 1.08 : 0.91
+    utterance.onstart = () => { setIsSpeaking(true); setStatus(`${character.name} está hablando`) }
+    utterance.onend = () => { setIsSpeaking(false); setStatus(`Prueba de voz terminada · ${character.name}`) }
+    utterance.onerror = () => { setIsSpeaking(false); setStatus('No se pudo reproducir la voz en este navegador.') }
+    window.speechSynthesis.speak(utterance)
   }
 
   return (
@@ -134,10 +160,10 @@ export default function App() {
             <div className="section-heading"><div><span className="step-number">01</span><div><h2>Tu vídeo</h2><p>Sube un vídeo desde tu computadora</p></div></div><button className="secondary-button" onClick={() => fileRef.current?.click()}><Upload size={16} /> Subir vídeo</button><input ref={fileRef} type="file" accept="video/*" hidden onChange={e => loadVideo(e.target.files?.[0])} /></div>
             <div className="video-stage">
               {videoUrl ? <video ref={videoRef} src={videoUrl} muted={muted} onPlay={() => setPlaying(true)} onPause={() => setPlaying(false)} controls={false} playsInline /> : <button className="empty-upload" onClick={() => fileRef.current?.click()}><span className="upload-icon"><Upload size={25} /></span><strong>Arrastra tu vídeo aquí</strong><span>o pulsa para buscarlo en tu PC</span><small>MP4 · WebM · MOV</small></button>}
-              {videoUrl && avatarVisible && <div className={`avatar-overlay ${avatarPosition}`} style={{'--avatar-size': `${avatarSize}%`, '--skin': character.skin, '--hair': character.hair, '--outfit': OUTFIT_COLORS[outfit] || character.outfit}}><div className="avatar-real"><img src={character.image} alt={character.name} /></div><span className="avatar-label">{character.name.toUpperCase()} <i>•</i> {outfit}</span></div>}
+              {videoUrl && avatarVisible && <div className={`avatar-overlay ${avatarPosition} ${isSpeaking ? 'speaking' : ''}`} style={{'--avatar-size': `${avatarSize}%`, '--skin': character.skin, '--hair': character.hair, '--outfit': OUTFIT_COLORS[outfit] || character.outfit}}><div className="avatar-real"><img src={character.image} alt={character.name} /></div><span className="avatar-label">{character.name.toUpperCase()} <i>•</i> {outfit}</span></div>}
               {videoUrl && <div className="video-controls"><button onClick={togglePlay} aria-label={playing ? 'Pausar' : 'Reproducir'}>{playing ? <Pause size={19} /> : <Play size={19} />}</button><span>{videoName}</span></div>}
             </div>
-            <div className="video-tools"><button className="tool-button" onClick={() => setAvatarVisible(v => !v)}><Move size={16} /> {avatarVisible ? 'Ocultar personaje' : 'Mostrar personaje'}</button><button className="tool-button" onClick={() => setAvatarPosition(p => p === 'right' ? 'left' : 'right')}>⇄ Cambiar lado</button><button className="tool-button" onClick={() => setMuted(v => !v)}>{muted ? <VolumeX size={16} /> : <Volume2 size={16} />} {muted ? 'Activar sonido' : 'Silenciar vista'}</button><div className="size-control"><span>Tamaño</span><input type="range" min="20" max="55" value={avatarSize} onChange={e => setAvatarSize(Number(e.target.value))} /></div></div>
+            <div className="video-tools"><button className="tool-button" onClick={() => setAvatarVisible(v => !v)}><Move size={16} /> {avatarVisible ? 'Ocultar personaje' : 'Mostrar personaje'}</button><button className="tool-button" onClick={() => setAvatarPosition(p => p === 'right' ? 'left' : 'right')}>⇄ Cambiar lado</button><button className="tool-button" onClick={() => setMuted(v => !v)}>{muted ? <VolumeX size={16} /> : <Volume2 size={16} />} {muted ? 'Activar sonido' : 'Silenciar vista'}</button><div className="size-control"><span>Tamaño</span><input type="range" min="10" max="30" value={avatarSize} onChange={e => setAvatarSize(Number(e.target.value))} /></div></div>
             {videoUrl && <div className="file-loaded"><span className="file-check">✓</span><span>{videoName}</span><button onClick={() => { setVideoUrl(''); setVideoName(''); setPlaying(false) }}>Quitar</button></div>}
             <section className="panel character-panel">
               <div className="panel-heading"><div><span className="step-number">02</span><div><h2>Elige tu personaje</h2><p>12 personajes iniciales: mujeres y hombres</p></div></div><Users size={19} /></div>
@@ -151,9 +177,9 @@ export default function App() {
             <section className="panel mode-panel"><div className="panel-heading"><div><span className="step-number">03</span><div><h2>Modo de actuación</h2><p>¿Cómo quieres que participe?</p></div></div><Settings2 size={18}/></div><div className="mode-list">{MODES.map(({id,name,detail,icon:Icon})=><button key={id} className={`mode-option ${mode===id?'selected':''}`} onClick={()=>{setMode(id);setStatus(`Modo seleccionado: ${name}`)}}><span className="mode-icon"><Icon size={18}/></span><span className="mode-text"><strong>{name}</strong><small>{detail}</small></span><span className="radio-mark">{mode===id?'✓':''}</span></button>)}</div></section>
             <section className="panel voice-panel">
               <div className="panel-heading"><div><span className="step-number">04</span><div><h2>Comentarios automáticos</h2><p>Un solo vídeo completo · sin recortes</p></div></div><Mic2 size={19}/></div>
-              <div className="voice-card"><div className="voice-orb"><Mic2 size={20}/></div><div className="voice-copy"><strong>Voz según el personaje</strong><small>{character.gender === 'Mujer' ? 'Voz femenina dominicana' : 'Voz masculina dominicana'} · selección automática</small></div><span className="soon-tag">MOTOR EN DESARROLLO</span></div>
+              <div className="voice-card"><div className="voice-orb"><Mic2 size={20}/></div><div className="voice-copy"><strong>Voz de {character.name}</strong><small>{character.gender === 'Mujer' ? 'Voz femenina' : 'Voz masculina'} · voz disponible en tu navegador</small></div><button className="test-voice-button" onClick={speakPresenter} disabled={!voiceEnabled || isSpeaking}>{isSpeaking ? 'HABLANDO…' : 'PROBAR VOZ'}</button></div>
               <label className="comment-frequency"><span>Frecuencia de comentarios</span><strong>Cada {commentInterval} segundos</strong><input type="range" min="20" max="180" step="10" value={commentInterval} onChange={e=>setCommentInterval(Number(e.target.value))}/></label>
-              <p className="microcopy">NINA conservará el vídeo entero y añadirá comentarios breves cuando haya algo interesante que comentar. La voz, el análisis de escenas y las expresiones todavía requieren integración.</p>
+              <p className="microcopy">Prueba la voz del personaje con el sintetizador de tu navegador. La voz dominicana dedicada y los comentarios automáticos según cada escena aún requieren integración.</p>
             </section>
             <section className="panel export-panel"><div className="panel-heading"><div><span className="step-number">05</span><div><h2>Vídeo final para YouTube</h2><p>Vídeo completo con personaje y comentarios</p></div></div><Download size={18}/></div><div className="export-preview"><div className="checker"><span className="mini-avatar">N</span></div><div><strong>WebM transparente</strong><small>También estudiaremos MOV ProRes 4444</small></div></div><button className="export-button" disabled><Download size={16}/> Exportación aún no conectada</button><p className="microcopy">{engineStatus}{localVideoId ? ' · archivo recibido localmente' : ''}</p></section>
           </aside>
