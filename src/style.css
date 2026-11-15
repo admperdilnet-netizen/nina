@@ -146,3 +146,9 @@ button{min-height:40px}
 .avatar-overlay.did-live{width:clamp(120px, var(--avatar-size), 220px);max-width:220px;aspect-ratio:3/4;background:#08080c;border:1px solid rgba(255,255,255,.18);box-shadow:0 10px 30px rgba(0,0,0,.45)}
 .avatar-overlay.did-live .did-avatar-video{object-fit:contain;object-position:center center;background:#08080c}
 .avatar-overlay.did-live .avatar-label{z-index:2}
+
+
+/* Preserve the actual D-ID camera framing: use the stream's native aspect ratio. */
+.avatar-overlay.did-live{height:auto;min-height:0;aspect-ratio:auto;overflow:hidden;border-radius:14px}
+.avatar-overlay.did-live .did-avatar-video{width:100%;height:auto;min-height:0;aspect-ratio:inherit;object-fit:contain;object-position:center;background:#08080c}
+.avatar-overlay.did-live .avatar-label{bottom:5px;max-width:calc(100% - 12px);overflow:hidden;text-overflow:ellipsis}
