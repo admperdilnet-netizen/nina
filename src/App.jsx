@@ -42,6 +42,14 @@ export default function App() {
   const [status, setStatus] = useState('Lista para comenzar')
   const [genderFilter, setGenderFilter] = useState('Todos')
   const [favoriteIds, setFavoriteIds] = useState(() => { try { return JSON.parse(localStorage.getItem('nina-favorites') || '[]') } catch { return [] } })
+  const [didConfigs, setDidConfigs] = useState(() => { try { return JSON.parse(localStorage.getItem('nina-did-agents') || '{}') } catch { return {} } })
+  const [didAgentId, setDidAgentId] = useState('')
+  const [didClientKey, setDidClientKey] = useState('')
+  const [didText, setDidText] = useState('¡Hola! Soy ' + (CHARACTERS.find(c => c.id === characterId)?.name || 'NINA') + '. Bienvenidos a NINA.')
+  const [didConnected, setDidConnected] = useState(false)
+  const [didBusy, setDidBusy] = useState(false)
+  const didManagerRef = useRef(null)
+  const didVideoRef = useRef(null)
   const [characterId, setCharacterId] = useState('luna')
   const [outfit, setOutfit] = useState('Glamour')
   const [hairStyle, setHairStyle] = useState('Largo ondulado')
@@ -103,6 +111,19 @@ export default function App() {
   }
 
   useEffect(() => { localStorage.setItem('nina-favorites', JSON.stringify(favoriteIds)) }, [favoriteIds])
+  useEffect(() => { localStorage.setItem('nina-did-agents', JSON.stringify(didConfigs)) }, [didConfigs])
+  useEffect(() => {
+    const saved = didConfigs[characterId] || {}
+    setDidAgentId(saved.agentId || '')
+    setDidClientKey(saved.clientKey || '')
+    setDidText(`¡Hola! Soy ${character.name}. Bienvenidos a NINA.`)
+    setDidConnected(false)
+    if (didManagerRef.current) {
+      const oldManager = didManagerRef.current
+      didManagerRef.current = null
+      Promise.resolve(oldManager.disconnect()).catch(() => {})
+    }
+  }, [characterId])
 
   function toggleFavorite(id) { setFavoriteIds(ids => ids.includes(id) ? ids.filter(x => x !== id) : [...ids, id]) }
 
@@ -111,6 +132,84 @@ export default function App() {
     setOutfit(c.style)
     setHairStyle(c.hairStyles[0])
     setStatus(`Personaje seleccionado: ${c.name}`)
+  }
+
+  function saveDidConfig() {
+    const agentId = didAgentId.trim()
+    const clientKey = didClientKey.trim()
+    if (!agentId || !clientKey) { setStatus('Introduce el Agent ID y el Client Key de D-ID para ' + character.name + '.'); return }
+    const next = { ...didConfigs, [characterId]: { agentId, clientKey } }
+    setDidConfigs(next)
+    setStatus('Configuración D-ID guardada para ' + character.name + '.')
+  }
+
+  async function connectDid() {
+    if (!didAgentId.trim() || !didClientKey.trim()) { setStatus('Configura primero el Agent ID y Client Key de D-ID.'); return }
+    if (didManagerRef.current) return didManagerRef.current
+    setDidBusy(true)
+    setStatus('Conectando el presentador D-ID de ' + character.name + '…')
+    try {
+      const sdk = await import('@d-id/client-sdk')
+      const manager = await sdk.createAgentManager(didAgentId.trim(), {
+        auth: { type: 'key', clientKey: didClientKey.trim() },
+        callbacks: {
+          onSrcObjectReady: stream => {
+            if (didVideoRef.current) {
+              didVideoRef.current.srcObject = stream
+              didVideoRef.current.play().catch(() => {})
+            }
+            setDidConnected(true)
+            setStatus('Presentador D-ID conectado: ' + character.name)
+          },
+          onError: error => {
+            console.error('D-ID session error:', error)
+            setStatus('D-ID informó un error de conexión. Revisa el agente y los dominios autorizados.')
+          },
+        },
+      })
+      didManagerRef.current = manager
+      await manager.connect()
+      setDidConnected(true)
+      setStatus('D-ID conectado. Ya puedes enviar texto al personaje.')
+      return manager
+    } catch (error) {
+      console.error('D-ID connection failed:', error)
+      setDidConnected(false)
+      setStatus('No se pudo conectar con D-ID. Comprueba Agent ID, Client Key, créditos y dominio autorizado.')
+      return null
+    } finally {
+      setDidBusy(false)
+    }
+  }
+
+  async function speakWithDid() {
+    if (!didText.trim()) { setStatus('Escribe el texto que debe decir ' + character.name + '.'); return }
+    setDidBusy(true)
+    try {
+      const manager = didManagerRef.current || await connectDid()
+      if (!manager) return
+      setIsSpeaking(true)
+      setStatus(character.name + ' está hablando con D-ID…')
+      await manager.speak({ type: 'text', input: didText.trim() })
+    } catch (error) {
+      console.error('D-ID speak failed:', error)
+      setStatus('D-ID no pudo iniciar el diálogo. Comprueba la configuración del agente.')
+      setIsSpeaking(false)
+    } finally {
+      setDidBusy(false)
+    }
+  }
+
+  function disconnectDid() {
+    const manager = didManagerRef.current
+    didManagerRef.current = null
+    if (manager) Promise.resolve(manager.disconnect()).catch(() => {})
+    if (didVideoRef.current) {
+      didVideoRef.current.srcObject = null
+    }
+    setDidConnected(false)
+    setIsSpeaking(false)
+    setStatus('Presentador D-ID desconectado.')
   }
 
   function toggleVoice() {
@@ -174,7 +273,7 @@ export default function App() {
             <div className="section-heading"><div><span className="step-number">01</span><div><h2>Tu vídeo</h2><p>Sube un vídeo desde tu computadora</p></div></div><button className="secondary-button" onClick={() => fileRef.current?.click()}><Upload size={16} /> Subir vídeo</button><input ref={fileRef} type="file" accept="video/*" hidden onChange={e => loadVideo(e.target.files?.[0])} /></div>
             <div className="video-stage">
               {videoUrl ? <video ref={videoRef} src={videoUrl} muted={muted} onPlay={() => setPlaying(true)} onPause={() => setPlaying(false)} controls={false} playsInline /> : <button className="empty-upload" onClick={() => fileRef.current?.click()}><span className="upload-icon"><Upload size={25} /></span><strong>Arrastra tu vídeo aquí</strong><span>o pulsa para buscarlo en tu PC</span><small>MP4 · WebM · MOV</small></button>}
-              {videoUrl && avatarVisible && <div className={`avatar-overlay ${avatarPosition} ${isSpeaking ? 'speaking' : ''} ${mouthOpen ? 'mouth-open' : ''}`} style={{'--avatar-size': `${avatarSize}%`, '--skin': character.skin, '--hair': character.hair, '--outfit': OUTFIT_COLORS[outfit] || character.outfit}}><div className="avatar-real"><img src={character.image} alt={character.name} /></div><span className="avatar-label">{character.name.toUpperCase()} <i>•</i> {outfit}</span></div>}
+              {videoUrl && avatarVisible && <div className={`avatar-overlay ${avatarPosition} ${isSpeaking ? 'speaking' : ''} ${didConnected ? 'did-live' : ''}`} style={{'--avatar-size': `${avatarSize}%`, '--skin': character.skin, '--hair': character.hair, '--outfit': OUTFIT_COLORS[outfit] || character.outfit}}>{didConnected ? <video ref={didVideoRef} className="did-avatar-video" autoPlay playsInline /> : <div className="avatar-real"><img src={character.image} alt={character.name} /></div>}<span className="avatar-label">{character.name.toUpperCase()} <i>•</i> {didConnected ? 'D-ID' : outfit}</span></div>}
               {videoUrl && <div className="video-controls"><button onClick={togglePlay} aria-label={playing ? 'Pausar' : 'Reproducir'}>{playing ? <Pause size={19} /> : <Play size={19} />}</button><span>{videoName}</span></div>}
             </div>
             <div className="video-tools"><button className="tool-button" onClick={() => setAvatarVisible(v => !v)}><Move size={16} /> {avatarVisible ? 'Ocultar personaje' : 'Mostrar personaje'}</button><button className="tool-button" onClick={() => setAvatarPosition(p => p === 'right' ? 'left' : 'right')}>⇄ Cambiar lado</button><button className="tool-button" onClick={() => setMuted(v => !v)}>{muted ? <VolumeX size={16} /> : <Volume2 size={16} />} {muted ? 'Activar sonido' : 'Silenciar vista'}</button><div className="size-control"><span>Tamaño</span><input type="range" min="8" max="22" value={avatarSize} onChange={e => setAvatarSize(Number(e.target.value))} /></div></div>
@@ -193,7 +292,16 @@ export default function App() {
               <div className="panel-heading"><div><span className="step-number">04</span><div><h2>Comentarios automáticos</h2><p>Un solo vídeo completo · sin recortes</p></div></div><Mic2 size={19}/></div>
               <div className="voice-card"><div className="voice-orb"><Mic2 size={20}/></div><div className="voice-copy"><strong>Voz de {character.name}</strong><small>{character.gender === 'Mujer' ? 'Voz femenina' : 'Voz masculina'} · voz disponible en tu navegador</small></div><button className="test-voice-button" onClick={speakPresenter} disabled={!voiceEnabled || isSpeaking}>{isSpeaking ? 'HABLANDO…' : 'PROBAR VOZ'}</button></div>
               <label className="comment-frequency"><span>Frecuencia de comentarios</span><strong>Cada {commentInterval} segundos</strong><input type="range" min="20" max="180" step="10" value={commentInterval} onChange={e=>setCommentInterval(Number(e.target.value))}/></label>
-              <p className="microcopy">Prueba la voz del personaje con el sintetizador de tu navegador. La voz dominicana dedicada y los comentarios automáticos según cada escena aún requieren integración.</p>
+              <div className="did-setup">
+                  <div className="did-heading"><strong>Presentador real con D-ID</strong><span>{didConnected ? 'CONECTADO' : 'CONFIGURACIÓN POR PERSONAJE'}</span></div>
+                  <label>Agent ID de {character.name}<input value={didAgentId} onChange={e=>setDidAgentId(e.target.value)} placeholder="agt_..." autoComplete="off" /></label>
+                  <label>Client Key de D-ID<input value={didClientKey} onChange={e=>setDidClientKey(e.target.value)} placeholder="Pega aquí el Client Key" autoComplete="off" /></label>
+                  <button className="tool-button did-save" onClick={saveDidConfig}>Guardar configuración de {character.name}</button>
+                  <label>Texto que dirá {character.name}<textarea rows="3" value={didText} onChange={e=>setDidText(e.target.value)} placeholder="Escribe lo que debe decir el personaje…" /></label>
+                  <div className="did-actions"><button className="test-voice-button" onClick={speakWithDid} disabled={didBusy}>{didBusy ? 'CONECTANDO…' : 'HABLAR CON D-ID'}</button><button className="tool-button" onClick={disconnectDid} disabled={!didConnected}>Desconectar</button></div>
+                  <p className="microcopy">Cada personaje necesita su propio Agent ID creado en D-ID Studio con su retrato y voz. El Client Key debe tener autorizado el dominio de NINA. Se guarda en este navegador.</p>
+                </div>
+                <p className="microcopy">La voz de prueba del navegador permanece disponible como alternativa. D-ID se encarga del vídeo facial y la sincronización labial real.</p>
             </section>
             <section className="panel export-panel"><div className="panel-heading"><div><span className="step-number">05</span><div><h2>Vídeo final para YouTube</h2><p>Vídeo completo con personaje y comentarios</p></div></div><Download size={18}/></div><div className="export-preview"><div className="checker"><span className="mini-avatar">N</span></div><div><strong>WebM transparente</strong><small>También estudiaremos MOV ProRes 4444</small></div></div><button className="export-button" disabled><Download size={16}/> Exportación aún no conectada</button><p className="microcopy">{engineStatus}{localVideoId ? ' · archivo recibido localmente' : ''}</p></section>
           </aside>
