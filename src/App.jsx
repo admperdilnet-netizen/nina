@@ -354,7 +354,7 @@ export default function App() {
                   <button className="tool-button did-save" onClick={saveDidConfig}>Guardar configuración de {character.name}</button>
                   <label>Texto que dirá {character.name}<textarea rows="3" value={didText} onChange={e=>setDidText(e.target.value)} placeholder="Escribe lo que debe decir el personaje…" /></label>
                   <div className="did-actions"><button className="test-voice-button" onClick={speakWithDid} disabled={didBusy}>{didBusy ? 'CONECTANDO…' : 'HABLAR CON D-ID'}</button><button className="tool-button" onClick={disconnectDid} disabled={!didConnected}>Desconectar</button></div>
-                  <p className="microcopy">Para expresiones naturales, parpadeo y movimiento de cabeza, crea el personaje como agente V4 Instant / Expressive en D-ID Studio usando un retrato frontal y bien iluminado. Los agentes antiguos tipo Talk (V2) animan una foto y no ofrecen el mismo realismo. Estado del modelo: {didAvatarType || "sin comprobar"}.</p>
+                  <p className="microcopy">Para expresiones naturales, parpadeo y movimiento de cabeza, crea el personaje con Image to Agent / V4 Instant en D-ID Studio usando un retrato frontal y bien iluminado. Los agentes antiguos tipo Talk (V2) animan una foto y no ofrecen el mismo realismo. Estado del modelo: {didAvatarType || "sin comprobar"}.</p>
                 </div>
                 <p className="microcopy">La voz de prueba del navegador permanece disponible como alternativa. D-ID se encarga del vídeo facial y la sincronización labial real.</p>
             </section>
