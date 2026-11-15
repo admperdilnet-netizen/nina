@@ -320,7 +320,7 @@ export default function App() {
               <div className="did-setup">
                   <div className="did-heading"><strong>Presentador real con D-ID</strong><span>{didConnected ? 'CONECTADO' : 'CONFIGURACIÓN POR PERSONAJE'}</span></div>
                   <label>Agent ID de {character.name}<input value={didAgentId} onChange={e=>setDidAgentId(e.target.value)} placeholder="agt_..." autoComplete="off" /></label>
-                  <label>Client Key de D-ID<input value={didClientKey} onChange={e=>setDidClientKey(e.target.value)} placeholder="Pega aquí el Client Key" autoComplete="off" /></label>
+                  <label>Client Key de D-ID<input type="password" value={didClientKey} onChange={e=>setDidClientKey(e.target.value)} placeholder="Pega aquí el Client Key" autoComplete="off" /></label>
                   <button className="tool-button did-save" onClick={saveDidConfig}>Guardar configuración de {character.name}</button>
                   <label>Texto que dirá {character.name}<textarea rows="3" value={didText} onChange={e=>setDidText(e.target.value)} placeholder="Escribe lo que debe decir el personaje…" /></label>
                   <div className="did-actions"><button className="test-voice-button" onClick={speakWithDid} disabled={didBusy}>{didBusy ? 'CONECTANDO…' : 'HABLAR CON D-ID'}</button><button className="tool-button" onClick={disconnectDid} disabled={!didConnected}>Desconectar</button></div>
