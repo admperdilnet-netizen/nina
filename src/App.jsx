@@ -206,7 +206,13 @@ export default function App() {
 
   async function connectDid() {
     if (!didAgentId.trim() || !didClientKey.trim()) { setStatus('Configura primero el Agent ID y Client Key de D-ID.'); return }
-    if (didManagerRef.current) return didManagerRef.current
+    if (didManagerRef.current) {
+      const connectionState = didManagerRef.current.getConnectionState?.()
+      if (connectionState === 'connected') return didManagerRef.current
+      try { await didManagerRef.current.disconnect() } catch {}
+      didManagerRef.current = null
+      didStreamRef.current = null
+    }
     setDidBusy(true)
     setStatus('Conectando el presentador D-ID de ' + character.name + '…')
     try {
@@ -245,9 +251,19 @@ export default function App() {
             didVideoRef.current.play().catch(() => {})
           }
         },
-        onError: error => {
-          console.error('D-ID session error:', error)
-          setStatus('D-ID informó un error de conexión. Revisa el agente y los dominios autorizados.')
+        onConnectionStateChange: state => {
+          console.info('D-ID connection state:', state)
+          if (state === 'connecting') setStatus('D-ID está estableciendo la conexión de vídeo…')
+          if (state === 'connected') setStatus('D-ID conectado · preparando la miniatura animada…')
+          if (state === 'disconnected') {
+            setDidConnected(false)
+            setIsSpeaking(false)
+          }
+        },
+        onError: (error, context) => {
+          console.error('D-ID session error:', error, context)
+          const detail = error?.message || error?.code || 'error de sesión'
+          setStatus('D-ID: ' + String(detail).slice(0, 180))
         },
       }
       manager = await sdk.createAgentManager(didAgentId.trim(), {
@@ -276,7 +292,15 @@ export default function App() {
       didStreamRef.current = null
       setDidConnected(false)
       setDidAvatarType('')
-      setStatus('No se pudo conectar con D-ID. Comprueba Agent ID, Client Key, créditos y dominio autorizado.')
+      const httpStatus = error?.httpStatus || error?.status || error?.statusCode
+      const code = error?.code ? ' (' + error.code + ')' : ''
+      let reason = error?.message || 'Error desconocido'
+      if (httpStatus === 401 || httpStatus === 403) reason = 'Client Key no autorizado para este Agent o dominio. Revisa el dominio autorizado en D-ID.'
+      else if (httpStatus === 404) reason = 'Agent ID no encontrado. Copia el ID desde el código Embed del Agent.'
+      else if (httpStatus === 402 || httpStatus === 429) reason = 'D-ID no tiene créditos disponibles o alcanzaste el límite del plan.'
+      else if (error?.name === 'NetworkError' || !navigator.onLine) reason = 'No hay conexión con D-ID. Revisa Internet, VPN o bloqueadores del navegador.'
+      else if (String(reason).toLowerCase().includes('not built')) reason = 'El Agent todavía se está preparando en D-ID Studio. Espera a que termine.'
+      setStatus('No se pudo conectar: ' + String(reason).slice(0, 190) + code)
       return null
     } finally {
       setDidBusy(false)
@@ -289,6 +313,7 @@ export default function App() {
     try {
       const manager = didManagerRef.current || await connectDid()
       if (!manager) return
+      if (manager.getConnectionState?.() !== 'connected') throw new Error('La sesión de vídeo todavía no está conectada. Pulsa CONECTAR MINIATURA.')
       setIsSpeaking(true)
       setStatus(character.name + ' está hablando con D-ID…')
       const result = await manager.speak({ type: 'text', input: didText.trim() })
@@ -411,7 +436,7 @@ export default function App() {
                   <label>Client Key de D-ID<input type="password" value={didClientKey} onChange={e=>setDidClientKey(e.target.value)} placeholder="Pega aquí el Client Key" autoComplete="off" /></label>
                   <button className="tool-button did-save" onClick={saveDidConfig}>Guardar configuración de {character.name}</button>
                   <label>Texto que dirá {character.name}<textarea rows="3" value={didText} onChange={e=>setDidText(e.target.value)} placeholder="Escribe lo que debe decir el personaje…" /></label>
-                  <div className="did-actions"><button className="test-voice-button" onClick={speakWithDid} disabled={didBusy}>{didBusy ? 'CONECTANDO…' : 'HABLAR CON D-ID'}</button><button className="tool-button" onClick={disconnectDid} disabled={!didConnected}>Desconectar</button></div>
+                  <div className="did-actions"><button className="tool-button" onClick={connectDid} disabled={didBusy || didConnected}>{didBusy ? 'CONECTANDO…' : didConnected ? 'CONECTADO' : 'CONECTAR MINIATURA'}</button><button className="test-voice-button" onClick={speakWithDid} disabled={didBusy || isSpeaking || !didConnected}>{isSpeaking ? 'HABLANDO…' : 'HABLAR CON D-ID'}</button><button className="tool-button" onClick={disconnectDid} disabled={!didConnected}>Desconectar</button></div>
                   <p className="microcopy">Para expresiones naturales, parpadeo y movimiento de cabeza, crea el personaje con Image to Agent / V4 Instant en D-ID Studio usando un retrato frontal y bien iluminado. Los agentes antiguos tipo Talk (V2) animan una foto y no ofrecen el mismo realismo. Estado del modelo: {didAvatarType || "sin comprobar"}.</p>
                 </div>
                 <p className="microcopy">La voz de prueba del navegador permanece disponible como alternativa. D-ID se encarga del vídeo facial y la sincronización labial real.</p>
