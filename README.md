@@ -44,3 +44,10 @@ npm run dev
 npm run build
 npm run preview
 ```
+
+
+## Motor local para Windows (fase inicial)
+
+Se añadió `local-engine/` como base del servicio que se ejecutará en el PC. Abre `local-engine/INICIAR-NINA.bat` para preparar el entorno y arrancar el servicio local. La interfaz puede consultar su estado y enviar el archivo al PC.
+
+**Alcance actual del motor:** servicio local, comprobación de FFmpeg y recepción local de vídeos. Todavía no genera comentarios, voz dominicana, expresiones faciales ni el vídeo final. Esas funciones no deben presentarse como disponibles hasta integrarlas y probarlas.

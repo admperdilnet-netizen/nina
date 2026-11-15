@@ -2,10 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Clapperboard, Mic2, Play, Pause, Upload, Volume2, VolumeX, Sparkles, Settings2, MessageCircle, Captions, Move, Download, Radio, WandSparkles, UserRound, Users, Shirt, Scissors } from 'lucide-react'
 
 const MODES = [
-  { id: 'commentator', name: 'Comentarista', detail: 'Reacciona y comenta las escenas.', icon: MessageCircle },
-  { id: 'narrator', name: 'Narradora', detail: 'Cuenta lo que sucede en el vídeo.', icon: Captions },
-  { id: 'character', name: 'Protagonista', detail: 'Participa en la historia.', icon: Clapperboard },
-  { id: 'auto', name: 'Automático', detail: 'Elige cómo participar según el contenido.', icon: WandSparkles },
+  { id: 'commentator', name: 'Comentarista automático', detail: 'Hace comentarios breves sobre el vídeo completo.', icon: MessageCircle },
 ]
 
 const CHARACTERS = [
@@ -35,7 +32,11 @@ export default function App() {
   const [avatarVisible, setAvatarVisible] = useState(true)
   const [avatarSize, setAvatarSize] = useState(34)
   const [avatarPosition, setAvatarPosition] = useState('right')
-  const [voiceEnabled, setVoiceEnabled] = useState(false)
+  const [voiceEnabled, setVoiceEnabled] = useState(true)
+  const [engineStatus, setEngineStatus] = useState('Comprobando motor local…')
+  const [engineReady, setEngineReady] = useState(false)
+  const [commentInterval, setCommentInterval] = useState(60)
+  const [localVideoId, setLocalVideoId] = useState('')
   const [status, setStatus] = useState('Lista para comenzar')
   const [genderFilter, setGenderFilter] = useState('Todos')
   const [characterId, setCharacterId] = useState('luna')
@@ -49,9 +50,22 @@ export default function App() {
     if (videoRef.current) videoRef.current.muted = muted
   }, [muted, videoUrl])
 
+  useEffect(() => {
+    fetch('http://127.0.0.1:8765/health')
+      .then(r => { if (!r.ok) throw new Error('offline'); return r.json() })
+      .then(data => {
+        setEngineReady(true)
+        setEngineStatus(data.ffmpeg_ready ? 'Motor local conectado · FFmpeg listo' : 'Motor conectado · falta FFmpeg')
+      })
+      .catch(() => {
+        setEngineReady(false)
+        setEngineStatus('Motor local desconectado · inicia NINA en tu PC')
+      })
+  }, [])
+
   useEffect(() => () => { if (videoUrl) URL.revokeObjectURL(videoUrl) }, [videoUrl])
 
-  function loadVideo(file) {
+  async function loadVideo(file) {
     if (!file || !file.type.startsWith('video/')) {
       setStatus('Selecciona un archivo de vídeo válido.')
       return
@@ -59,7 +73,19 @@ export default function App() {
     setVideoUrl(URL.createObjectURL(file))
     setVideoName(file.name)
     setPlaying(false)
-    setStatus('Vídeo cargado. Puedes reproducirlo.')
+    setLocalVideoId('')
+    setStatus('Vídeo cargado. Conectando con el motor local…')
+    try {
+      const form = new FormData()
+      form.append('file', file)
+      const response = await fetch('http://127.0.0.1:8765/upload', { method: 'POST', body: form })
+      if (!response.ok) throw new Error('No se pudo enviar el vídeo al motor local.')
+      const result = await response.json()
+      setLocalVideoId(result.video_id)
+      setStatus('Vídeo completo guardado en tu PC · listo para preparar')
+    } catch {
+      setStatus('Vista previa cargada. Inicia NINA Local Engine para procesar en tu PC.')
+    }
   }
 
   async function togglePlay() {
@@ -95,7 +121,7 @@ export default function App() {
       </header>
       <main className="workspace">
         <section className="intro">
-          <div><p className="eyebrow"><Sparkles size={14} /> TU ESTUDIO DE PERSONAJES E HISTORIAS</p><h1>Hola, soy <span>NINA.</span></h1><p className="intro-copy">Elige quién quieres que aparezca en tus vídeos. Personaliza su estilo y dale vida a tus historias.</p></div>
+          <div><p className="eyebrow"><Sparkles size={14} /> TU ESTUDIO DE PERSONAJES E HISTORIAS</p><h1>Hola, soy <span>NINA.</span></h1><p className="intro-copy">Elige un presentador. NINA conservará tu vídeo completo y añadirá comentarios y reacciones para YouTube.</p></div>
           <div className="intro-tag"><Radio size={16} /> ESTUDIO PERSONAL</div>
         </section>
         <div className="studio-grid">
@@ -117,9 +143,14 @@ export default function App() {
             </section>
           </section>
           <aside className="side-column">
-            <section className="panel mode-panel"><div className="panel-heading"><div><span className="step-number">03</span><div><h2>Modo de actuación</h2><p>¿Cómo quieres que participe?</p></div></div><Settings2 size={18}/></div><div className="mode-list">{MODES.map(({id,name,detail,icon:Icon})=><button key={id} className={`mode-option ${mode===id?'selected':''}`} onClick={()=>{setMode(id);setStatus(`Modo seleccionado: ${name}. El motor se conectará en la siguiente fase.`)}}><span className="mode-icon"><Icon size={18}/></span><span className="mode-text"><strong>{name}</strong><small>{detail}</small></span><span className="radio-mark">{mode===id?'✓':''}</span></button>)}</div></section>
-            <section className="panel voice-panel"><div className="panel-heading"><div><span className="step-number">04</span><div><h2>Voz del personaje</h2><p>Voz femenina o masculina · acento dominicano</p></div></div><Mic2 size={19}/></div><div className="voice-card"><div className="voice-orb"><Mic2 size={20}/></div><div className="voice-copy"><strong>Voz natural y expresiva</strong><small>Opciones de voz por personaje</small></div><span className="soon-tag">SIGUIENTE FASE</span></div><button className={`primary-button ${voiceEnabled?'active':''}`} onClick={toggleVoice}><Mic2 size={17}/>{voiceEnabled?'Desactivar voz':'Activar voz'}</button><p className="microcopy">El motor de voz y la sincronización labial todavía no están conectados.</p></section>
-            <section className="panel export-panel"><div className="panel-heading"><div><span className="step-number">05</span><div><h2>Exportar a vídeo</h2><p>Personaje con fondo transparente</p></div></div><Download size={18}/></div><div className="export-preview"><div className="checker"><span className="mini-avatar">N</span></div><div><strong>WebM transparente</strong><small>También estudiaremos MOV ProRes 4444</small></div></div><button className="export-button" disabled><Download size={16}/> Exportación — próximamente</button></section>
+            <section className="panel mode-panel"><div className="panel-heading"><div><span className="step-number">03</span><div><h2>Modo de actuación</h2><p>¿Cómo quieres que participe?</p></div></div><Settings2 size={18}/></div><div className="mode-list">{MODES.map(({id,name,detail,icon:Icon})=><button key={id} className={`mode-option ${mode===id?'selected':''}`} onClick={()=>{setMode(id);setStatus(`Modo seleccionado: ${name}`)}}><span className="mode-icon"><Icon size={18}/></span><span className="mode-text"><strong>{name}</strong><small>{detail}</small></span><span className="radio-mark">{mode===id?'✓':''}</span></button>)}</div></section>
+            <section className="panel voice-panel">
+              <div className="panel-heading"><div><span className="step-number">04</span><div><h2>Comentarios automáticos</h2><p>Un solo vídeo completo · sin recortes</p></div></div><Mic2 size={19}/></div>
+              <div className="voice-card"><div className="voice-orb"><Mic2 size={20}/></div><div className="voice-copy"><strong>Voz según el personaje</strong><small>{character.gender === 'Mujer' ? 'Voz femenina dominicana' : 'Voz masculina dominicana'} · selección automática</small></div><span className="soon-tag">MOTOR EN DESARROLLO</span></div>
+              <label className="comment-frequency"><span>Frecuencia de comentarios</span><strong>Cada {commentInterval} segundos</strong><input type="range" min="20" max="180" step="10" value={commentInterval} onChange={e=>setCommentInterval(Number(e.target.value))}/></label>
+              <p className="microcopy">NINA conservará el vídeo entero y añadirá comentarios breves cuando haya algo interesante que comentar. La voz, el análisis de escenas y las expresiones todavía requieren integración.</p>
+            </section>
+            <section className="panel export-panel"><div className="panel-heading"><div><span className="step-number">05</span><div><h2>Vídeo final para YouTube</h2><p>Vídeo completo con personaje y comentarios</p></div></div><Download size={18}/></div><div className="export-preview"><div className="checker"><span className="mini-avatar">N</span></div><div><strong>WebM transparente</strong><small>También estudiaremos MOV ProRes 4444</small></div></div><button className="export-button" disabled><Download size={16}/> Exportación aún no conectada</button><p className="microcopy">{engineStatus}{localVideoId ? ' · archivo recibido localmente' : ''}</p></section>
           </aside>
         </div>
         <footer className="footer-note"><span>✦</span> NINA incluye ahora una biblioteca seleccionable de personajes y estilos. Las voces, animación real, análisis de escenas y exportación todavía están pendientes de integración.</footer>
