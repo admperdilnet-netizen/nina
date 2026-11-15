@@ -1,6 +1,7 @@
 @echo off
 setlocal
 cd /d "%~dp0"
+if exist "AVATAR-LOCAL-CONFIG.bat" call "AVATAR-LOCAL-CONFIG.bat"
 title NINA - Motor local (perfil 8 GB)
 echo ==========================================
 echo       NINA - PERFIL LIGERO PARA 8 GB
