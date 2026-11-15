@@ -21,6 +21,29 @@ const CHARACTERS = [
 ]
 const OUTFITS = ['Elegante','Casual','Urbano','Glamour','Deportivo','Formal','Tropical','Artístico']
 const OUTFIT_COLORS = {Elegante:'#263c66',Casual:'#477d70',Urbano:'#b27627',Glamour:'#a52d55',Deportivo:'#287b9a',Formal:'#403d62',Tropical:'#d18b25',Artístico:'#784b91'}
+const SPANISH_VOICE_COUNTRIES = [
+  { code: 'DO', name: 'República Dominicana', accent: 'Caribeño' },
+  { code: 'PR', name: 'Puerto Rico', accent: 'Caribeño' },
+  { code: 'CU', name: 'Cuba', accent: 'Caribeño' },
+  { code: 'MX', name: 'México', accent: 'Mexicano' },
+  { code: 'CO', name: 'Colombia', accent: 'Colombiano' },
+  { code: 'VE', name: 'Venezuela', accent: 'Venezolano' },
+  { code: 'AR', name: 'Argentina', accent: 'Rioplatense' },
+  { code: 'UY', name: 'Uruguay', accent: 'Rioplatense' },
+  { code: 'CL', name: 'Chile', accent: 'Chileno' },
+  { code: 'PE', name: 'Perú', accent: 'Peruano' },
+  { code: 'EC', name: 'Ecuador', accent: 'Ecuatoriano' },
+  { code: 'BO', name: 'Bolivia', accent: 'Boliviano' },
+  { code: 'PY', name: 'Paraguay', accent: 'Paraguayo' },
+  { code: 'CR', name: 'Costa Rica', accent: 'Centroamericano' },
+  { code: 'PA', name: 'Panamá', accent: 'Centroamericano' },
+  { code: 'GT', name: 'Guatemala', accent: 'Centroamericano' },
+  { code: 'SV', name: 'El Salvador', accent: 'Centroamericano' },
+  { code: 'HN', name: 'Honduras', accent: 'Centroamericano' },
+  { code: 'NI', name: 'Nicaragua', accent: 'Centroamericano' },
+  { code: 'ES', name: 'España', accent: 'Castellano' },
+  { code: 'US', name: 'Estados Unidos (español)', accent: 'Latino de EE. UU.' },
+];
 const HAIR_STYLES = ['Largo ondulado','Liso largo','Coleta alta','Bob moderno','Rizos definidos','Afro natural','Trenzas','Corto rizado','Degradado','Rizos cortos','Clásico peinado','Trenzas cortas','Rapado','Largo recogido','Afro corto']
 
 export default function App() {
@@ -44,6 +67,7 @@ export default function App() {
   const [favoriteIds, setFavoriteIds] = useState(() => { try { return JSON.parse(localStorage.getItem('nina-favorites') || '[]') } catch { return [] } })
   const [didConfigs, setDidConfigs] = useState(() => { try { return JSON.parse(localStorage.getItem('nina-did-agents') || '{}') } catch { return {} } })
   const [didAgentId, setDidAgentId] = useState('')
+  const [voiceCountry, setVoiceCountry] = useState('DO')
   const [didClientKey, setDidClientKey] = useState('')
   const [didText, setDidText] = useState('¡Hola! Soy Luna. Bienvenidos a NINA.')
   const [didConnected, setDidConnected] = useState(false)
@@ -122,8 +146,9 @@ export default function App() {
   }, [didConnected])
   useEffect(() => {
     const saved = didConfigs[characterId] || {}
-    setDidAgentId(saved.agentId || '')
-    setDidClientKey(saved.clientKey || '')
+    const countryConfig = saved.countryAgents?.[voiceCountry] || (voiceCountry === 'DO' ? saved : {})
+    setDidAgentId(countryConfig.agentId || '')
+    setDidClientKey(countryConfig.clientKey || '')
     setDidText(`¡Hola! Soy ${character.name}. Bienvenidos a NINA.`)
     setDidConnected(false)
     didStreamRef.current = null
@@ -132,7 +157,7 @@ export default function App() {
       didManagerRef.current = null
       Promise.resolve(oldManager.disconnect()).catch(() => {})
     }
-  }, [characterId])
+  }, [characterId, voiceCountry])
 
   function toggleFavorite(id) { setFavoriteIds(ids => ids.includes(id) ? ids.filter(x => x !== id) : [...ids, id]) }
 
@@ -147,9 +172,11 @@ export default function App() {
     const agentId = didAgentId.trim()
     const clientKey = didClientKey.trim()
     if (!agentId || !clientKey) { setStatus('Introduce el Agent ID y el Client Key de D-ID para ' + character.name + '.'); return }
-    const next = { ...didConfigs, [characterId]: { agentId, clientKey } }
+    const current = didConfigs[characterId] || {}
+    const countryAgents = { ...(current.countryAgents || {}), [voiceCountry]: { agentId, clientKey } }
+    const next = { ...didConfigs, [characterId]: { ...current, agentId: voiceCountry === 'DO' ? agentId : current.agentId, clientKey: voiceCountry === 'DO' ? clientKey : current.clientKey, countryAgents } }
     setDidConfigs(next)
-    setStatus('Configuración D-ID guardada para ' + character.name + '.')
+    setStatus('Voz de ' + character.name + ' guardada para ' + SPANISH_VOICE_COUNTRIES.find(x => x.code === voiceCountry)?.name + '.')
   }
 
   async function connectDid() {
@@ -349,7 +376,13 @@ export default function App() {
               <label className="comment-frequency"><span>Frecuencia de comentarios</span><strong>Cada {commentInterval} segundos</strong><input type="range" min="20" max="180" step="10" value={commentInterval} onChange={e=>setCommentInterval(Number(e.target.value))}/></label>
               <div className="did-setup">
                   <div className="did-heading"><strong>Presentador real con D-ID</strong><span>{didConnected ? 'CONECTADO' : 'CONFIGURACIÓN POR PERSONAJE'}</span></div>
-                  <label>Agent ID de {character.name}<input value={didAgentId} onChange={e=>setDidAgentId(e.target.value)} placeholder="agt_..." autoComplete="off" /></label>
+                  <label>País del acento español
+                    <select value={voiceCountry} onChange={e => setVoiceCountry(e.target.value)}>
+                      {SPANISH_VOICE_COUNTRIES.map(country => <option key={country.code} value={country.code}>{country.name} · {country.accent}</option>)}
+                    </select>
+                  </label>
+                  <p className="microcopy">Configura un Agent de D-ID por país y personaje, eligiendo allí una voz española del acento deseado. Al cambiar el país, NINA cargará la configuración guardada para esa combinación.</p>
+                  <label>Agent ID de {character.name} · {SPANISH_VOICE_COUNTRIES.find(x => x.code === voiceCountry)?.name}<input value={didAgentId} onChange={e=>setDidAgentId(e.target.value)} placeholder="agt_..." autoComplete="off" /></label>
                   <label>Client Key de D-ID<input type="password" value={didClientKey} onChange={e=>setDidClientKey(e.target.value)} placeholder="Pega aquí el Client Key" autoComplete="off" /></label>
                   <button className="tool-button did-save" onClick={saveDidConfig}>Guardar configuración de {character.name}</button>
                   <label>Texto que dirá {character.name}<textarea rows="3" value={didText} onChange={e=>setDidText(e.target.value)} placeholder="Escribe lo que debe decir el personaje…" /></label>
