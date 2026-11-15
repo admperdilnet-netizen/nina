@@ -59,3 +59,6 @@ button{min-height:40px}
  .install-hint{font-size:9px;max-width:105px}
 }
 @media(hover:none){.character-card:hover,.secondary-button:hover,.tool-button:hover{border-color:var(--line);background:rgba(255,255,255,.025)}}
+
+/* Character identity details */
+.character-card{min-height:178px}.character-card small{line-height:1.25;text-align:center}.character-card .character-style{color:#c4a6ff;font-weight:700}.selected-character-info{margin-top:13px;padding:13px 14px;border:1px solid rgba(167,139,250,.28);border-radius:12px;background:linear-gradient(120deg,rgba(167,139,250,.12),rgba(240,166,215,.06))}.selected-character-info>div{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}.selected-character-info strong{font-size:13px;color:#fff}.selected-character-info span,.selected-character-info p,.selected-character-info small{font-size:10px;color:#c5bfd2}.selected-character-info p{line-height:1.5;margin:8px 0 5px}.selected-character-info small{color:#c5a7ff}.character-card.chosen{box-shadow:0 0 0 1px rgba(185,154,255,.2),0 8px 20px rgba(0,0,0,.12)}
