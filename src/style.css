@@ -159,3 +159,10 @@ button{min-height:40px}
 .video-stage.presenter-visible .avatar-overlay{z-index:3;bottom:12px;left:2.2%;right:auto;pointer-events:none}
 .video-stage.presenter-visible .avatar-overlay .avatar-label{font-size:7px;letter-spacing:.04em;max-width:calc(100% - 8px);white-space:normal;text-align:center;line-height:1.25}
 @media(max-width:600px){.video-stage.presenter-visible .empty-upload{width:calc(100% - 112px);margin-left:112px}.video-stage.presenter-visible .avatar-overlay{left:2%;bottom:10px}}
+
+
+/* Keep playback controls below the video so filenames and buttons never cover the thumbnail. */
+.video-controls{position:static;left:auto;right:auto;bottom:auto;margin-top:8px;padding:6px 9px;background:rgba(27,24,36,.88);backdrop-filter:blur(8px);border:1px solid var(--line);border-radius:9px;justify-content:flex-start;min-height:42px}
+.video-controls button{width:30px;height:30px;min-height:30px;flex:none}
+.video-controls .playback-hint{font-size:9px;color:#aaa2b9;white-space:nowrap}
+@media(max-width:600px){.video-controls{left:auto;right:auto;bottom:auto;padding:5px 7px;margin-top:7px}}
