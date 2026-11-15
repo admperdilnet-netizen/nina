@@ -134,3 +134,15 @@ button{min-height:40px}
 .did-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 .did-actions .test-voice-button{margin:0}
 .did-setup button:disabled{opacity:.45;cursor:not-allowed}
+
+
+/* Real lip-sync only: never draw a fake mouth over a still portrait or video. */
+.avatar-real:before,
+.avatar-overlay.speaking .avatar-real:before,
+.avatar-overlay.mouth-open .avatar-real:before{content:none!important;display:none!important;animation:none!important}
+.avatar-overlay.speaking .avatar-real img,
+.avatar-overlay .avatar-real,
+.avatar-overlay.speaking{animation:none!important;transform:none!important}
+.avatar-overlay.did-live{width:clamp(120px, var(--avatar-size), 220px);max-width:220px;aspect-ratio:3/4;background:#08080c;border:1px solid rgba(255,255,255,.18);box-shadow:0 10px 30px rgba(0,0,0,.45)}
+.avatar-overlay.did-live .did-avatar-video{object-fit:contain;object-position:center center;background:#08080c}
+.avatar-overlay.did-live .avatar-label{z-index:2}
