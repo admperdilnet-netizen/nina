@@ -1,0 +1,65 @@
+name: NINA Android APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'src/**'
+      - 'public/**'
+      - 'index.html'
+      - 'package.json'
+      - 'vite.config.js'
+      - 'capacitor.config.json'
+      - '.github/workflows/android-apk.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  build-apk:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Descargar código
+        uses: actions/checkout@v4
+
+      - name: Preparar Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Preparar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+
+      - name: Instalar dependencias web
+        run: npm install
+
+      - name: Instalar Capacitor para Android
+        run: npm install --no-save @capacitor/core@6.2.0 @capacitor/cli@6.2.0 @capacitor/android@6.2.0
+
+      - name: Compilar interfaz para Android
+        run: npm run build
+        env:
+          CAPACITOR_BUILD: 'true'
+
+      - name: Crear proyecto Android
+        run: npx cap add android
+
+      - name: Sincronizar aplicación
+        run: npx cap sync android
+
+      - name: Generar APK instalable
+        run: cd android && ./gradlew assembleDebug --no-daemon
+
+      - name: Publicar APK para descarga
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: nina-android-build-${{ github.run_number }}
+          name: NINA para Android - compilación ${{ github.run_number }}
+          files: android/app/build/outputs/apk/debug/app-debug.apk
+          make_latest: true
+          fail_on_unmatched_files: true
