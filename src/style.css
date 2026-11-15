@@ -78,3 +78,20 @@ button{min-height:40px}
 .avatar-overlay{overflow:visible}
 .avatar-real:after{content:"";position:absolute;inset:55% 0 0;background:linear-gradient(transparent,rgba(12,10,18,.22));pointer-events:none}
 @media(max-width:600px){.character-portrait{width:58px;height:68px}.character-card{min-height:150px}}
+
+
+/* Compact presenter docked to the left, with subtle idle and speech motion */
+.avatar-overlay{max-width:150px;bottom:52px;transform-origin:50% 90%;animation:presenter-idle 5s ease-in-out infinite}
+.avatar-overlay.left{left:2.2%;right:auto}
+.avatar-overlay.right{right:2.2%;left:auto}
+.avatar-real{border-radius:48% 48% 12% 12%;transform-origin:50% 85%}
+.avatar-real:before{content:"";position:absolute;z-index:4;left:49%;top:55%;width:10px;height:3px;transform:translateX(-50%);border-radius:50% 50% 65% 65%;background:rgba(105,35,43,.82);opacity:.85}
+.avatar-overlay.speaking .avatar-real:before{animation:presenter-mouth .19s ease-in-out infinite alternate}
+.avatar-overlay.speaking{animation:presenter-talk .7s ease-in-out infinite}
+@keyframes presenter-idle{0%,100%{transform:translateY(0) rotate(0deg)}25%{transform:translateY(-2px) rotate(-.6deg)}75%{transform:translateY(1px) rotate(.6deg)}}
+@keyframes presenter-talk{0%,100%{transform:translateY(0) rotate(-.4deg)}50%{transform:translateY(-3px) rotate(.5deg)}}
+@keyframes presenter-mouth{from{height:2px;width:7px;transform:translateX(-50%) scaleY(.7)}to{height:8px;width:10px;transform:translateX(-50%) scaleY(1)}}
+.test-voice-button{border:1px solid rgba(185,154,255,.4);border-radius:8px;background:rgba(167,139,250,.16);color:#d9c8ff;padding:9px 10px;font-size:8px;font-weight:800;letter-spacing:.06em;cursor:pointer;white-space:nowrap}
+.test-voice-button:disabled{opacity:.55;cursor:default}
+@media(max-width:600px){.avatar-overlay{max-width:112px;bottom:43px}.avatar-overlay.left{left:2%}.test-voice-button{margin-left:48px}}
+@media(prefers-reduced-motion:reduce){.avatar-overlay,.avatar-overlay.speaking .avatar-real:before{animation:none!important}}
