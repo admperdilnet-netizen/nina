@@ -1,0 +1,9 @@
+{
+  "appId": "com.nina.presentadoradominicana",
+  "appName": "NINA",
+  "webDir": "dist",
+  "bundledWebRuntime": false,
+  "server": {
+    "androidScheme": "https"
+  }
+}
