@@ -47,6 +47,7 @@ export default function App() {
   const [didClientKey, setDidClientKey] = useState('')
   const [didText, setDidText] = useState('¡Hola! Soy Luna. Bienvenidos a NINA.')
   const [didConnected, setDidConnected] = useState(false)
+  const [didAvatarType, setDidAvatarType] = useState('')
   const [didBusy, setDidBusy] = useState(false)
   const didManagerRef = useRef(null)
   const didVideoRef = useRef(null)
@@ -202,6 +203,8 @@ export default function App() {
         callbacks,
       })
       didManagerRef.current = manager
+      const configuredAvatarType = manager.agent?.avatar?.type || 'unknown'
+      setDidAvatarType(configuredAvatarType)
       await manager.connect()
       streamType = manager.getStreamType?.() || null
       if (didVideoRef.current && didStreamRef.current) {
@@ -211,6 +214,7 @@ export default function App() {
       }
       setDidConnected(true)
       const avatarType = manager.agent?.avatar?.type || 'desconocido'
+      setDidAvatarType(avatarType)
       setStatus('D-ID conectado · avatar ' + avatarType + ' · flujo ' + (streamType || 'pendiente'))
       return manager
     } catch (error) {
@@ -219,6 +223,7 @@ export default function App() {
       didManagerRef.current = null
       didStreamRef.current = null
       setDidConnected(false)
+      setDidAvatarType('')
       setStatus('No se pudo conectar con D-ID. Comprueba Agent ID, Client Key, créditos y dominio autorizado.')
       return null
     } finally {
@@ -257,6 +262,7 @@ export default function App() {
     }
     didStreamRef.current = null
     setDidConnected(false)
+    setDidAvatarType('')
     setIsSpeaking(false)
     setStatus('Presentador D-ID desconectado.')
   }
@@ -322,7 +328,7 @@ export default function App() {
             <div className="section-heading"><div><span className="step-number">01</span><div><h2>Tu vídeo</h2><p>Sube un vídeo desde tu computadora</p></div></div><button className="secondary-button" onClick={() => fileRef.current?.click()}><Upload size={16} /> Subir vídeo</button><input ref={fileRef} type="file" accept="video/*" hidden onChange={e => loadVideo(e.target.files?.[0])} /></div>
             <div className="video-stage">
               {videoUrl ? <video ref={videoRef} src={videoUrl} muted={muted} onPlay={() => setPlaying(true)} onPause={() => setPlaying(false)} controls={false} playsInline /> : <button className="empty-upload" onClick={() => fileRef.current?.click()}><span className="upload-icon"><Upload size={25} /></span><strong>Arrastra tu vídeo aquí</strong><span>o pulsa para buscarlo en tu PC</span><small>MP4 · WebM · MOV</small></button>}
-              {videoUrl && avatarVisible && <div className={`avatar-overlay ${avatarPosition} ${isSpeaking ? 'speaking' : ''} ${didConnected ? 'did-live' : ''}`} style={{'--avatar-size': `${avatarSize}%`, '--skin': character.skin, '--hair': character.hair, '--outfit': OUTFIT_COLORS[outfit] || character.outfit}}>{didConnected ? <video ref={didVideoRef} className="did-avatar-video" autoPlay playsInline /> : <div className="avatar-real"><img src={character.image} alt={character.name} /></div>}<span className="avatar-label">{character.name.toUpperCase()} <i>•</i> {didConnected ? 'D-ID' : outfit}</span></div>}
+              {videoUrl && avatarVisible && <div className={`avatar-overlay ${avatarPosition} ${isSpeaking ? 'speaking' : ''} ${didConnected ? 'did-live' : ''}`} style={{'--avatar-size': `${avatarSize}%`, '--skin': character.skin, '--hair': character.hair, '--outfit': OUTFIT_COLORS[outfit] || character.outfit}}>{didConnected ? <video ref={didVideoRef} className="did-avatar-video" autoPlay playsInline onLoadedMetadata={e => { const v = e.currentTarget; if (v.videoWidth && v.videoHeight && v.parentElement) v.parentElement.style.aspectRatio = `${v.videoWidth} / ${v.videoHeight}`; }} /> : <div className="avatar-real"><img src={character.image} alt={character.name} /></div>}<span className="avatar-label">{character.name.toUpperCase()} <i>•</i> {didConnected ? 'D-ID' : outfit}</span></div>}
               {videoUrl && <div className="video-controls"><button onClick={togglePlay} aria-label={playing ? 'Pausar' : 'Reproducir'}>{playing ? <Pause size={19} /> : <Play size={19} />}</button><span>{videoName}</span></div>}
             </div>
             <div className="video-tools"><button className="tool-button" onClick={() => setAvatarVisible(v => !v)}><Move size={16} /> {avatarVisible ? 'Ocultar personaje' : 'Mostrar personaje'}</button><button className="tool-button" onClick={() => setAvatarPosition(p => p === 'right' ? 'left' : 'right')}>⇄ Cambiar lado</button><button className="tool-button" onClick={() => setMuted(v => !v)}>{muted ? <VolumeX size={16} /> : <Volume2 size={16} />} {muted ? 'Activar sonido' : 'Silenciar vista'}</button><div className="size-control"><span>Tamaño</span><input type="range" min="8" max="22" value={avatarSize} onChange={e => setAvatarSize(Number(e.target.value))} /></div></div>
@@ -348,7 +354,7 @@ export default function App() {
                   <button className="tool-button did-save" onClick={saveDidConfig}>Guardar configuración de {character.name}</button>
                   <label>Texto que dirá {character.name}<textarea rows="3" value={didText} onChange={e=>setDidText(e.target.value)} placeholder="Escribe lo que debe decir el personaje…" /></label>
                   <div className="did-actions"><button className="test-voice-button" onClick={speakWithDid} disabled={didBusy}>{didBusy ? 'CONECTANDO…' : 'HABLAR CON D-ID'}</button><button className="tool-button" onClick={disconnectDid} disabled={!didConnected}>Desconectar</button></div>
-                  <p className="microcopy">Cada personaje necesita su propio Agent ID creado en D-ID Studio con su retrato y voz. El Client Key debe tener autorizado el dominio de NINA. Se guarda en este navegador.</p>
+                  <p className="microcopy">Para expresiones naturales, parpadeo y movimiento de cabeza, crea el personaje como agente V4 Instant / Expressive en D-ID Studio usando un retrato frontal y bien iluminado. Los agentes antiguos tipo Talk (V2) animan una foto y no ofrecen el mismo realismo. Estado del modelo: {didAvatarType || "sin comprobar"}.</p>
                 </div>
                 <p className="microcopy">La voz de prueba del navegador permanece disponible como alternativa. D-ID se encarga del vídeo facial y la sincronización labial real.</p>
             </section>
