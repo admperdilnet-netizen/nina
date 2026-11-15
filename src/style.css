@@ -181,3 +181,5 @@ button{min-height:40px}
 .local-avatar-result a{color:#a9eac2;font-size:10px;text-decoration:underline}
 .avatar-overlay.did-live .did-avatar-video[controls]{pointer-events:auto}
 @media(max-width:600px){.local-avatar-setup{padding:10px}.local-avatar-button{min-height:44px}}
+
+.avatar-overlay.local-live{pointer-events:auto;max-width:220px;width:clamp(120px,var(--avatar-size),220px);aspect-ratio:3/4;overflow:hidden;border-radius:14px}.avatar-overlay.local-live .did-avatar-video{width:100%;height:100%;object-fit:contain;background:#08080c}
