@@ -30,7 +30,7 @@ export default function App() {
   const [playing, setPlaying] = useState(false)
   const [muted, setMuted] = useState(false)
   const [avatarVisible, setAvatarVisible] = useState(true)
-  const [avatarSize, setAvatarSize] = useState(18)
+  const [avatarSize, setAvatarSize] = useState(13)
   const [avatarPosition, setAvatarPosition] = useState('left')
   const [isSpeaking, setIsSpeaking] = useState(false)
   const [mouthOpen, setMouthOpen] = useState(false)
@@ -126,13 +126,18 @@ export default function App() {
     if (!('speechSynthesis' in window)) { setStatus('Este navegador no ofrece voz sintética.'); return }
     window.speechSynthesis.cancel()
     const voices = window.speechSynthesis.getVoices()
-    const spanishVoices = voices.filter(v => /^es(-|_)/i.test(v.lang))
-    const femaleName = /helena|sabina|monica|mónica|laura|lucia|lucía|dalia|paulina|elena|female|woman|mujer|aria|jenny|zira/i
-    const maleName = /pablo|jorge|raul|raúl|diego|antonio|carlos|juan|miguel|male|man|hombre|david|enrique|alfonso/i
+    const spanishVoices = voices.filter(v => /^es([-_]|$)/i.test(v.lang))
+    const femaleName = /helena|sabina|monica|mónica|laura|lucia|lucía|dalia|paulina|elena|female|woman|mujer|aria|jenny|zira|sofia|carmen|isabel|maria|maría|paloma|penelope|penélope/i
+    const maleName = /pablo|jorge|raul|raúl|diego|antonio|carlos|juan|miguel|male|man|hombre|david|enrique|alfonso|andres|andrés|luis|sergio|jorge/i
     const isFemale = character.gender === 'Mujer'
-    const preferred = spanishVoices.find(v => (isFemale ? femaleName : maleName).test(v.name))
+    const genderPattern = isFemale ? femaleName : maleName
+    const genderVoices = spanishVoices.filter(v => genderPattern.test(v.name))
+    const preferred = genderVoices.sort((a, b) => {
+      const rank = v => /^es[-_]DO$/i.test(v.lang) ? 0 : /^es[-_](PR|US|MX|419)$/i.test(v.lang) ? 1 : 2
+      return rank(a) - rank(b)
+    })[0]
     if (!preferred) {
-      setStatus(`No encontré una voz española claramente ${isFemale ? 'femenina' : 'masculina'} en este navegador. No usaré una voz del género equivocado.`)
+      setStatus(`Este dispositivo no ofrece una voz española identificable como ${isFemale ? 'femenina' : 'masculina'} para ${character.name}. Revisa las voces instaladas en Windows o Chrome; NINA no cambiará al género equivocado.`)
       return
     }
     const phrase = isFemale
@@ -143,9 +148,9 @@ export default function App() {
     utterance.lang = preferred.lang
     utterance.rate = isFemale ? 0.96 : 0.94
     utterance.pitch = 1
-    utterance.onstart = () => { setIsSpeaking(true); setMouthOpen(false); setStatus(`${character.name} está hablando con voz ${isFemale ? 'femenina' : 'masculina'}`) }
-    utterance.onboundary = (event) => {
-      if (event.name === 'word') setMouthOpen(v => !v)
+    utterance.onstart = () => { setIsSpeaking(true); setMouthOpen(true); setStatus(`${character.name} está hablando · voz ${isFemale ? 'femenina' : 'masculina'} · ${preferred.name}`) }
+    utterance.onboundary = event => {
+      if (event.name === 'word') setMouthOpen(true)
     }
     utterance.onend = () => { setIsSpeaking(false); setMouthOpen(false); setStatus(`Prueba de voz terminada · ${character.name}`) }
     utterance.onerror = () => { setIsSpeaking(false); setMouthOpen(false); setStatus('No se pudo reproducir la voz seleccionada en este navegador.') }
@@ -172,7 +177,7 @@ export default function App() {
               {videoUrl && avatarVisible && <div className={`avatar-overlay ${avatarPosition} ${isSpeaking ? 'speaking' : ''} ${mouthOpen ? 'mouth-open' : ''}`} style={{'--avatar-size': `${avatarSize}%`, '--skin': character.skin, '--hair': character.hair, '--outfit': OUTFIT_COLORS[outfit] || character.outfit}}><div className="avatar-real"><img src={character.image} alt={character.name} /></div><span className="avatar-label">{character.name.toUpperCase()} <i>•</i> {outfit}</span></div>}
               {videoUrl && <div className="video-controls"><button onClick={togglePlay} aria-label={playing ? 'Pausar' : 'Reproducir'}>{playing ? <Pause size={19} /> : <Play size={19} />}</button><span>{videoName}</span></div>}
             </div>
-            <div className="video-tools"><button className="tool-button" onClick={() => setAvatarVisible(v => !v)}><Move size={16} /> {avatarVisible ? 'Ocultar personaje' : 'Mostrar personaje'}</button><button className="tool-button" onClick={() => setAvatarPosition(p => p === 'right' ? 'left' : 'right')}>⇄ Cambiar lado</button><button className="tool-button" onClick={() => setMuted(v => !v)}>{muted ? <VolumeX size={16} /> : <Volume2 size={16} />} {muted ? 'Activar sonido' : 'Silenciar vista'}</button><div className="size-control"><span>Tamaño</span><input type="range" min="10" max="30" value={avatarSize} onChange={e => setAvatarSize(Number(e.target.value))} /></div></div>
+            <div className="video-tools"><button className="tool-button" onClick={() => setAvatarVisible(v => !v)}><Move size={16} /> {avatarVisible ? 'Ocultar personaje' : 'Mostrar personaje'}</button><button className="tool-button" onClick={() => setAvatarPosition(p => p === 'right' ? 'left' : 'right')}>⇄ Cambiar lado</button><button className="tool-button" onClick={() => setMuted(v => !v)}>{muted ? <VolumeX size={16} /> : <Volume2 size={16} />} {muted ? 'Activar sonido' : 'Silenciar vista'}</button><div className="size-control"><span>Tamaño</span><input type="range" min="8" max="22" value={avatarSize} onChange={e => setAvatarSize(Number(e.target.value))} /></div></div>
             {videoUrl && <div className="file-loaded"><span className="file-check">✓</span><span>{videoName}</span><button onClick={() => { setVideoUrl(''); setVideoName(''); setPlaying(false) }}>Quitar</button></div>}
             <section className="panel character-panel">
               <div className="panel-heading"><div><span className="step-number">02</span><div><h2>Elige tu personaje</h2><p>12 personajes iniciales: mujeres y hombres</p></div></div><Users size={19} /></div>
