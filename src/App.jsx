@@ -103,18 +103,21 @@ export default function App() {
   useEffect(() => () => { if (videoUrl) URL.revokeObjectURL(videoUrl) }, [videoUrl])
 
   async function loadVideo(file) {
-    if (!file || !file.type.startsWith('video/')) {
-      setStatus('Selecciona un archivo de vídeo válido.')
+    // Algunos navegadores asignan MIME vacío a videos descargados; validar también por extensión.
+    const videoExtension = /\\.(mp4|m4v|webm|mov|ogv|ogg|avi|mkv|mpeg|mpg)$/i.test(file?.name || '')
+    if (!file || (!file.type.startsWith('video/') && !videoExtension)) {
+      setStatus('Selecciona un archivo de vídeo válido (MP4, WebM, MOV u otro formato de video).')
       return
     }
-    setVideoUrl(URL.createObjectURL(file))
+    const nextUrl = URL.createObjectURL(file)
+    setVideoUrl(nextUrl)
     setVideoName(file.name)
     setPlaying(false)
     setLocalVideoId('')
-    setStatus('Vídeo cargado. Conectando con el motor local…')
+    setStatus('Vídeo cargado. Comprobando reproducción y conectando con el motor local…')
     try {
       const form = new FormData()
-      form.append('file', file)
+      form.append('file', file, file.name)
       const response = await fetch('http://127.0.0.1:8765/upload', { method: 'POST', body: form })
       if (!response.ok) throw new Error('No se pudo enviar el vídeo al motor local.')
       const result = await response.json()
@@ -354,7 +357,7 @@ export default function App() {
           <section className="video-column">
             <div className="section-heading"><div><span className="step-number">01</span><div><h2>Tu vídeo</h2><p>Sube un vídeo desde tu computadora</p></div></div><button className="secondary-button" onClick={() => fileRef.current?.click()}><Upload size={16} /> Subir vídeo</button><input ref={fileRef} type="file" accept="video/*" hidden onChange={e => loadVideo(e.target.files?.[0])} /></div>
             <div className={`video-stage ${avatarVisible && !videoUrl ? 'presenter-visible' : ''}`}>
-              {videoUrl ? <video ref={videoRef} src={videoUrl} muted={muted} onPlay={() => setPlaying(true)} onPause={() => setPlaying(false)} controls={false} playsInline /> : <button className="empty-upload" onClick={() => fileRef.current?.click()}><span className="upload-icon"><Upload size={25} /></span><strong>Arrastra tu vídeo aquí</strong><span>o pulsa para buscarlo en tu PC</span><small>MP4 · WebM · MOV</small></button>}
+              {videoUrl ? <video ref={videoRef} src={videoUrl} muted={muted} onPlay={() => setPlaying(true)} onPause={() => setPlaying(false)} onLoadedMetadata={e => { const v = e.currentTarget; if (Number.isFinite(v.duration) && v.duration > 0) setStatus('Vídeo listo para reproducir · ' + Math.round(v.duration) + ' segundos'); }} onError={e => { const code = e.currentTarget.error?.code; const detail = code === 4 ? 'formato o códec no compatible con Chrome' : code === 3 ? 'error al decodificar el video' : code === 2 ? 'error al leer el archivo' : 'no se pudo cargar el video'; setPlaying(false); setStatus('NINA no pudo reproducir este archivo: ' + detail + '. Prueba convertirlo a MP4 H.264 con audio AAC.'); }} controls={false} playsInline /> : <button className="empty-upload" onClick={() => fileRef.current?.click()}><span className="upload-icon"><Upload size={25} /></span><strong>Arrastra tu vídeo aquí</strong><span>o pulsa para buscarlo en tu PC</span><small>MP4 · WebM · MOV</small></button>}
               {avatarVisible && <div className={`avatar-overlay ${avatarPosition} ${isSpeaking ? 'speaking' : ''} ${didConnected ? 'did-live' : ''}`} style={{'--avatar-size': `${avatarSize}%`, '--skin': character.skin, '--hair': character.hair, '--outfit': OUTFIT_COLORS[outfit] || character.outfit}}>{didConnected ? <video ref={didVideoRef} className="did-avatar-video" autoPlay playsInline onLoadedMetadata={e => { const v = e.currentTarget; if (v.videoWidth && v.videoHeight && v.parentElement) v.parentElement.style.aspectRatio = `${v.videoWidth} / ${v.videoHeight}`; }} /> : <div className="avatar-real"><img src={character.image} alt={character.name} /></div>}<span className="avatar-label">{character.name.toUpperCase()} <i>•</i> {didConnected ? 'EN VIVO · D-ID' : 'CONECTA PARA ANIMAR'}</span></div>}
               {videoUrl && <div className="video-controls"><button onClick={togglePlay} aria-label={playing ? 'Pausar' : 'Reproducir'} title={playing ? 'Pausar vídeo' : 'Reproducir vídeo'}>{playing ? <Pause size={19} /> : <Play size={19} />}</button><span className="playback-hint">{playing ? 'Reproduciendo vídeo' : 'Reproducir vídeo'}</span></div>}
             </div>
