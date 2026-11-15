@@ -159,24 +159,37 @@ export default function App() {
     try {
       const sdk = await import('@d-id/client-sdk')
       let manager = null
+      let streamType = null
       const callbacks = {
         onSrcObjectReady: stream => {
           didStreamRef.current = stream
+          if (didVideoRef.current) {
+            didVideoRef.current.pause()
+            didVideoRef.current.removeAttribute('src')
+            didVideoRef.current.srcObject = stream
+            didVideoRef.current.play().catch(() => {})
+          }
           setDidConnected(true)
           setStatus('Presentador D-ID conectado: ' + character.name)
         },
         onVideoStateChange: state => {
           const speaking = state === 'START'
           setIsSpeaking(speaking)
-          if (didVideoRef.current) {
-            if (speaking && didStreamRef.current) {
-              didVideoRef.current.src = ''
+          if (!didVideoRef.current || !didStreamRef.current) return
+          // Fluent (Expressive V4 / Fluent Clips) uses one continuous stream.
+          // Only Legacy sessions should replace the stream with the idle video.
+          if (streamType === 'legacy' && !speaking) {
+            didVideoRef.current.pause()
+            didVideoRef.current.srcObject = null
+            didVideoRef.current.src = manager?.agent?.idle_video || ''
+            didVideoRef.current.play().catch(() => {})
+          } else {
+            if (didVideoRef.current.srcObject !== didStreamRef.current) {
+              didVideoRef.current.pause()
+              didVideoRef.current.removeAttribute('src')
               didVideoRef.current.srcObject = didStreamRef.current
-              didVideoRef.current.play().catch(() => {})
-            } else if (!speaking) {
-              didVideoRef.current.srcObject = null
-              didVideoRef.current.src = manager?.agent?.idle_video || ''
             }
+            didVideoRef.current.play().catch(() => {})
           }
         },
         onError: error => {
@@ -190,8 +203,15 @@ export default function App() {
       })
       didManagerRef.current = manager
       await manager.connect()
+      streamType = manager.getStreamType?.() || null
+      if (didVideoRef.current && didStreamRef.current) {
+        didVideoRef.current.removeAttribute('src')
+        didVideoRef.current.srcObject = didStreamRef.current
+        didVideoRef.current.play().catch(() => {})
+      }
       setDidConnected(true)
-      setStatus('D-ID conectado. Ya puedes enviar texto al personaje.')
+      const avatarType = manager.agent?.avatar?.type || 'desconocido'
+      setStatus('D-ID conectado · avatar ' + avatarType + ' · flujo ' + (streamType || 'pendiente'))
       return manager
     } catch (error) {
       console.error('D-ID connection failed:', error)
@@ -214,7 +234,10 @@ export default function App() {
       if (!manager) return
       setIsSpeaking(true)
       setStatus(character.name + ' está hablando con D-ID…')
-      await manager.speak({ type: 'text', input: didText.trim() })
+      const result = await manager.speak({ type: 'text', input: didText.trim() })
+      if (result?.videoId === '' && manager.agent?.avatar?.type !== 'expressive') {
+        setStatus('D-ID aceptó el texto, pero no generó vídeo. Revisa que el agente tenga modo de vídeo activado y no esté en modo solo texto.')
+      }
     } catch (error) {
       console.error('D-ID speak failed:', error)
       setStatus('D-ID no pudo iniciar el diálogo. Comprueba la configuración del agente.')
