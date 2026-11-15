@@ -127,8 +127,8 @@ button{min-height:40px}
 .did-heading strong{font-size:11px;color:#eee8fa}
 .did-heading span{font-size:8px;letter-spacing:.08em;color:#bca0ff}
 .did-setup label{display:flex;flex-direction:column;gap:5px;color:#bdb5ca;font-size:9px}
-.did-setup input,.did-setup textarea{width:100%;min-width:0;border:1px solid var(--line);border-radius:8px;background:#171520;color:#f7f5fb;padding:9px;font:inherit;font-size:10px;outline:none}
-.did-setup input:focus,.did-setup textarea:focus{border-color:#a78bfa}
+.did-setup input,.did-setup textarea,.did-setup select{width:100%;min-width:0;border:1px solid var(--line);border-radius:8px;background:#171520;color:#f7f5fb;padding:9px;font:inherit;font-size:10px;outline:none}
+.did-setup input:focus,.did-setup textarea:focus,.did-setup select:focus{border-color:#a78bfa}
 .did-setup textarea{resize:vertical;line-height:1.5}
 .did-save{align-self:flex-start}
 .did-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
