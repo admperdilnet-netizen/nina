@@ -125,6 +125,7 @@ export default function App() {
     setDidClientKey(saved.clientKey || '')
     setDidText(`¡Hola! Soy ${character.name}. Bienvenidos a NINA.`)
     setDidConnected(false)
+    didStreamRef.current = null
     if (didManagerRef.current) {
       const oldManager = didManagerRef.current
       didManagerRef.current = null
