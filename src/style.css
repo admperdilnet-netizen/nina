@@ -62,3 +62,10 @@ button{min-height:40px}
 
 /* Character identity details */
 .character-card{min-height:178px}.character-card small{line-height:1.25;text-align:center}.character-card .character-style{color:#c4a6ff;font-weight:700}.selected-character-info{margin-top:13px;padding:13px 14px;border:1px solid rgba(167,139,250,.28);border-radius:12px;background:linear-gradient(120deg,rgba(167,139,250,.12),rgba(240,166,215,.06))}.selected-character-info>div{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}.selected-character-info strong{font-size:13px;color:#fff}.selected-character-info span,.selected-character-info p,.selected-character-info small{font-size:10px;color:#c5bfd2}.selected-character-info p{line-height:1.5;margin:8px 0 5px}.selected-character-info small{color:#c5a7ff}.character-card.chosen{box-shadow:0 0 0 1px rgba(185,154,255,.2),0 8px 20px rgba(0,0,0,.12)}
+
+.character-card-wrap{position:relative;min-width:0}
+.character-card-wrap .character-card{width:100%;height:100%;padding-top:15px}
+.favorite-button{position:absolute;right:7px;top:7px;width:25px;height:25px;border:1px solid rgba(255,255,255,.13);border-radius:50%;background:rgba(13,11,19,.8);color:#aaa2b6;display:grid;place-items:center;cursor:pointer}
+.favorite-button.is-favorite{color:#ffd36b;border-color:rgba(255,211,107,.45);background:rgba(255,190,50,.12)}
+.character-card-wrap .character-card strong{padding:0 20px}
+@media(max-width:480px){.character-grid{grid-template-columns:repeat(3,minmax(0,1fr))}.character-card{min-height:150px}}
