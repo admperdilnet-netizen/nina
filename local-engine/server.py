@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import shutil
+import subprocess
 import uuid
 from pathlib import Path
 from typing import Any
@@ -8,6 +9,7 @@ from typing import Any
 import imageio_ffmpeg
 import psutil
 from fastapi import FastAPI, File, HTTPException, UploadFile
+from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 
 APP_DIR = Path(__file__).resolve().parent
@@ -123,6 +125,56 @@ async def upload_video(file: UploadFile = File(...)) -> dict[str, Any]:
         "stored_locally": True,
         "message": "Vídeo recibido en el disco local. Todavía no se ha modificado ni exportado.",
     }
+
+
+
+def find_video_path(video_id: str) -> Path:
+    # IDs are generated as UUID hex strings; reject path fragments from clients.
+    if not video_id or any(ch not in "0123456789abcdef" for ch in video_id.lower()):
+        raise HTTPException(status_code=400, detail="Identificador de vídeo no válido.")
+    matches = list(WORK_DIR.glob(f"{video_id}.*"))
+    source = next((p for p in matches if not p.name.endswith("_browser.mp4") and p.is_file()), None)
+    if source is None:
+        raise HTTPException(status_code=404, detail="No se encontró el vídeo cargado. Vuelve a subirlo.")
+    return source
+
+
+@app.post("/convert/{video_id}")
+def convert_video_for_browser(video_id: str) -> dict[str, Any]:
+    source = find_video_path(video_id)
+    target = WORK_DIR / f"{video_id}_browser.mp4"
+    if target.exists() and target.stat().st_size > 0:
+        return {"ok": True, "converted": True, "format": "MP4 H.264 + AAC"}
+    ffmpeg = ffmpeg_path()
+    if not ffmpeg:
+        raise HTTPException(status_code=503, detail="FFmpeg no está disponible en el motor local.")
+    command = [
+        ffmpeg, "-y", "-i", str(source),
+        "-map", "0:v:0", "-map", "0:a?",
+        "-c:v", "libx264", "-preset", "ultrafast", "-crf", "23",
+        "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "128k",
+        "-movflags", "+faststart", str(target),
+    ]
+    try:
+        result = subprocess.run(command, capture_output=True, text=True, timeout=1800, check=False)
+    except subprocess.TimeoutExpired:
+        target.unlink(missing_ok=True)
+        raise HTTPException(status_code=504, detail="La conversión tardó demasiado. Prueba con un vídeo más corto.")
+    if result.returncode != 0 or not target.exists() or target.stat().st_size == 0:
+        target.unlink(missing_ok=True)
+        detail = (result.stderr or "FFmpeg no pudo convertir el archivo.")[-1200:]
+        raise HTTPException(status_code=422, detail="No se pudo convertir el vídeo a H.264: " + detail)
+    return {"ok": True, "converted": True, "format": "MP4 H.264 + AAC", "size_bytes": target.stat().st_size}
+
+
+@app.get("/play/{video_id}")
+def play_converted_video(video_id: str) -> FileResponse:
+    find_video_path(video_id)
+    target = WORK_DIR / f"{video_id}_browser.mp4"
+    if not target.exists() or target.stat().st_size == 0:
+        raise HTTPException(status_code=404, detail="El vídeo todavía no está convertido. Vuelve a cargarlo.")
+    return FileResponse(target, media_type="video/mp4", filename=target.name)
+
 
 
 @app.get("/")
