@@ -51,3 +51,19 @@ npm run preview
 Se añadió `local-engine/` como base del servicio que se ejecutará en el PC. Abre `local-engine/INICIAR-NINA.bat` para preparar el entorno y arrancar el servicio local. La interfaz puede consultar su estado y enviar el archivo al PC.
 
 **Alcance actual del motor:** servicio local, comprobación de FFmpeg y recepción local de vídeos. Todavía no genera comentarios, voz dominicana, expresiones faciales ni el vídeo final. Esas funciones no deben presentarse como disponibles hasta integrarlas y probarlas.
+
+
+## NINA para celulares y tabletas (PWA)
+
+La web ahora incluye una primera capa de aplicación instalable:
+- Manifiesto con modo independiente, nombre e iconos.
+- Diseño adaptable para teléfonos y tabletas, controles táctiles y áreas seguras.
+- Aviso de instalación cuando el navegador lo permite.
+- Service worker con caché básica de la interfaz para volver a abrir el shell sin conexión.
+
+### Instalar
+- Android: abre `https://admperdilnet-netizen.github.io/nina/` en Chrome y selecciona Instalar aplicación (o menú > Instalar aplicación / Añadir a pantalla de inicio).
+- iPhone/iPad: abre el enlace en Safari, toca Compartir y selecciona Añadir a pantalla de inicio.
+
+### Limitación importante
+Esta PWA es la aplicación móvil de interfaz. El motor local actual está diseñado para Windows y escucha en el propio PC (127.0.0.1); una PWA abierta en un teléfono no puede utilizar directamente ese servicio del PC. El procesamiento de vídeo local en móviles/tabletas requiere un motor móvil específico o una conexión segura entre dispositivos, que queda para una fase posterior. La PWA no genera todavía el vídeo comentado final.
