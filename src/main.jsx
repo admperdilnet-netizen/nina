@@ -6,20 +6,14 @@ import './style.css'
 
 function InstallPrompt() {
   const [promptEvent, setPromptEvent] = useState(null)
-  const [installed, setInstalled] = useState(
-    window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true
-  )
+  const [installed, setInstalled] = useState(window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true)
   const [dismissed, setDismissed] = useState(false)
+  const isIOS = /iphone|ipad|ipod/i.test(window.navigator.userAgent) || (window.navigator.platform === 'MacIntel' && window.navigator.maxTouchPoints > 1)
+  const isSafari = /^((?!chrome|crios|fxios|edgios|opios).)*safari/i.test(window.navigator.userAgent)
 
   useEffect(() => {
-    const onPrompt = event => {
-      event.preventDefault()
-      setPromptEvent(event)
-    }
-    const onInstalled = () => {
-      setInstalled(true)
-      setPromptEvent(null)
-    }
+    const onPrompt = event => { event.preventDefault(); setPromptEvent(event) }
+    const onInstalled = () => { setInstalled(true); setPromptEvent(null) }
     window.addEventListener('beforeinstallprompt', onPrompt)
     window.addEventListener('appinstalled', onInstalled)
     return () => {
@@ -38,8 +32,8 @@ function InstallPrompt() {
   if (installed || dismissed) return null
   return (
     <aside className="install-prompt" aria-label="Instalar NINA">
-      <div><strong>Instala NINA en tu dispositivo</strong><small>Ábrela desde tu pantalla de inicio como una aplicación.</small></div>
-      {promptEvent ? <button onClick={install}><Download size={16}/> Instalar</button> : <span className="install-hint">Menú del navegador · Añadir a pantalla de inicio</span>}
+      <div><strong>Instala NINA en tu dispositivo</strong><small>{isIOS ? 'En Safari: pulsa Compartir y luego “Añadir a pantalla de inicio”.' : 'Ábrela desde tu pantalla de inicio como una aplicación.'}</small></div>
+      {promptEvent ? <button onClick={install}><Download size={16}/> Instalar</button> : isIOS && !isSafari ? <span className="install-hint">Abre este enlace en Safari para instalar NINA.</span> : <span className="install-hint">{isIOS ? 'Compartir · Añadir a pantalla de inicio' : 'Menú del navegador · Añadir a pantalla de inicio'}</span>}
       <button className="install-close" aria-label="Cerrar" onClick={() => setDismissed(true)}><X size={16}/></button>
     </aside>
   )
