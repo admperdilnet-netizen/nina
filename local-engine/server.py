@@ -1,14 +1,16 @@
 from __future__ import annotations
 
+import os
 import shutil
 import subprocess
+import sys
 import uuid
 from pathlib import Path
 from typing import Any
 
 import imageio_ffmpeg
 import psutil
-from fastapi import FastAPI, File, HTTPException, UploadFile
+from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -180,3 +182,156 @@ def play_converted_video(video_id: str) -> FileResponse:
 @app.get("/")
 def root() -> dict[str, str]:
     return {"service": "NINA Local Video Engine", "health": "/health"}
+
+
+# Optional, fully local talking-avatar pipeline.
+# Configure these paths on the user's PC; no cloud API or paid credits are used.
+SADTALKER_DIR = Path(os.environ.get("NINA_SADTALKER_DIR", APP_DIR / "SadTalker")).resolve()
+SADTALKER_PYTHON = os.environ.get("NINA_SADTALKER_PYTHON", "")
+PIPER_PYTHON = os.environ.get("NINA_PIPER_PYTHON", sys.executable)
+PIPER_FEMALE_MODEL = os.environ.get("NINA_PIPER_FEMALE_MODEL", "")
+PIPER_MALE_MODEL = os.environ.get("NINA_PIPER_MALE_MODEL", "")
+AVATAR_WORK_DIR = WORK_DIR / "avatars"
+AVATAR_WORK_DIR.mkdir(exist_ok=True)
+MAX_AVATAR_IMAGE_BYTES = 15 * 1024 * 1024
+
+
+def avatar_engine_status() -> dict[str, Any]:
+    inference = SADTALKER_DIR / "inference.py"
+    python_path = SADTALKER_PYTHON or sys.executable
+    checkpoints_dir = SADTALKER_DIR / "checkpoints"
+    checkpoints_ready = checkpoints_dir.is_dir() and any(checkpoints_dir.iterdir())
+    piper_python_ready = Path(PIPER_PYTHON).is_file()
+    try:
+        piper_check = subprocess.run(
+            [PIPER_PYTHON, "-m", "piper", "--help"],
+            capture_output=True,
+            text=True,
+            timeout=8,
+            check=False,
+        ) if piper_python_ready else None
+        piper_ready = bool(piper_check and piper_check.returncode == 0)
+    except (OSError, subprocess.TimeoutExpired):
+        piper_ready = False
+    female_model = Path(PIPER_FEMALE_MODEL) if PIPER_FEMALE_MODEL else None
+    male_model = Path(PIPER_MALE_MODEL) if PIPER_MALE_MODEL else None
+    female_ready = bool(piper_ready and female_model and female_model.is_file() and female_model.with_suffix(female_model.suffix + ".json").is_file())
+    male_ready = bool(piper_ready and male_model and male_model.is_file() and male_model.with_suffix(male_model.suffix + ".json").is_file())
+    sadtalker_ready = inference.is_file() and checkpoints_ready and Path(python_path).is_file()
+    available = sadtalker_ready and piper_ready and female_ready and male_ready
+    return {
+        "available": available,
+        "sadtalker_ready": sadtalker_ready,
+        "checkpoints_ready": checkpoints_ready,
+        "piper_ready": piper_ready,
+        "female_voice_ready": female_ready,
+        "male_voice_ready": male_ready,
+        "sadtalker_dir": str(SADTALKER_DIR),
+        "message": "Motor local listo." if available else "Falta instalar/configurar SadTalker, sus checkpoints, Piper o los dos modelos de voz (.onnx + .onnx.json). D-ID sigue intacto.",
+    }
+
+
+@app.get("/avatar/status")
+def local_avatar_status() -> dict[str, Any]:
+    return avatar_engine_status()
+
+
+@app.post("/avatar/generate")
+def generate_local_avatar(
+    image: UploadFile = File(...),
+    text: str = Form(...),
+    gender: str = Form("female"),
+) -> dict[str, Any]:
+    config = avatar_engine_status()
+    if not config["available"]:
+        raise HTTPException(
+            status_code=503,
+            detail="El motor gratuito todavía no está instalado. Configura SadTalker y Piper en este PC; D-ID no se ha modificado.",
+        )
+    phrase = (text or "").strip()
+    if not phrase or len(phrase) > 1800:
+        raise HTTPException(status_code=400, detail="Escribe un texto de entre 1 y 1800 caracteres.")
+    suffix = Path(image.filename or "portrait.png").suffix.lower()
+    if suffix not in {".png", ".jpg", ".jpeg", ".webp"}:
+        raise HTTPException(status_code=415, detail="El retrato debe ser PNG, JPG o WEBP.")
+    if gender not in {"female", "male"}:
+        raise HTTPException(status_code=400, detail="Tipo de voz no válido.")
+
+    job_id = uuid.uuid4().hex
+    job_dir = AVATAR_WORK_DIR / job_id
+    job_dir.mkdir(parents=True, exist_ok=False)
+    image_path = job_dir / ("portrait" + suffix)
+    audio_path = job_dir / "speech.wav"
+    result_dir = job_dir / "results"
+    result_dir.mkdir()
+    total = 0
+    try:
+        with image_path.open("wb") as out:
+            while chunk := image.file.read(256 * 1024):
+                total += len(chunk)
+                if total > MAX_AVATAR_IMAGE_BYTES:
+                    raise HTTPException(status_code=413, detail="El retrato supera el límite de 15 MB.")
+                out.write(chunk)
+    finally:
+        image.file.close()
+    if total == 0:
+        raise HTTPException(status_code=400, detail="El retrato está vacío.")
+
+    voice_model = PIPER_FEMALE_MODEL if gender == "female" else PIPER_MALE_MODEL
+    try:
+        tts = subprocess.run(
+            [PIPER_PYTHON, "-m", "piper", "-m", voice_model, "-f", str(audio_path), "--", phrase],
+            text=True,
+            capture_output=True,
+            timeout=180,
+            check=False,
+        )
+        if tts.returncode != 0 or not audio_path.is_file() or audio_path.stat().st_size == 0:
+            raise RuntimeError((tts.stderr or "Piper no pudo generar la voz.")[-1000:])
+
+        command = [
+            SADTALKER_PYTHON or sys.executable,
+            str(SADTALKER_DIR / "inference.py"),
+            "--source_image", str(image_path),
+            "--driven_audio", str(audio_path),
+            "--result_dir", str(result_dir),
+            "--checkpoint_dir", str(SADTALKER_DIR / "checkpoints"),
+            "--size", "256",
+            "--batch_size", "1",
+            "--preprocess", "crop",
+            "--cpu",
+        ]
+        rendered = subprocess.run(
+            command,
+            cwd=str(SADTALKER_DIR),
+            capture_output=True,
+            text=True,
+            timeout=3600,
+            check=False,
+        )
+        videos = sorted(result_dir.rglob("*.mp4"), key=lambda p: p.stat().st_mtime, reverse=True)
+        if rendered.returncode != 0 or not videos:
+            detail = (rendered.stderr or rendered.stdout or "SadTalker no generó el vídeo.")[-1600:]
+            raise RuntimeError(detail)
+        final_path = AVATAR_WORK_DIR / (job_id + ".mp4")
+        shutil.copy2(videos[0], final_path)
+        return {
+            "ok": True,
+            "job_id": job_id,
+            "video_url": f"http://127.0.0.1:8765/avatar/play/{job_id}",
+            "message": "Vídeo hablado generado localmente.",
+        }
+    except subprocess.TimeoutExpired:
+        raise HTTPException(status_code=504, detail="La generación tardó más de lo permitido. En CPU puede tardar varios minutos; prueba con un texto más corto.")
+    except RuntimeError as exc:
+        raise HTTPException(status_code=500, detail="No se pudo generar el avatar local: " + str(exc)[:1600])
+
+
+@app.get("/avatar/play/{job_id}")
+def play_local_avatar(job_id: str) -> FileResponse:
+    if not job_id or any(ch not in "0123456789abcdef" for ch in job_id.lower()):
+        raise HTTPException(status_code=400, detail="Identificador de vídeo no válido.")
+    path = AVATAR_WORK_DIR / (job_id + ".mp4")
+    if not path.is_file():
+        raise HTTPException(status_code=404, detail="No se encontró el vídeo generado.")
+    return FileResponse(path, media_type="video/mp4", filename="nina-" + job_id[:8] + ".mp4")

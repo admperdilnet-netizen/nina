@@ -31,3 +31,10 @@ Implementado: servicio local, detección de RAM/espacio libre, perfil de bajo co
 Todavía NO implementado: análisis semántico de escenas, generación de comentarios, voz dominicana local, animación facial realista, sincronización labial ni exportación final del vídeo. Los límites de FFmpeg son la configuración prevista para la siguiente fase de render, no una función de exportación ya disponible.
 
 Los vídeos recibidos se guardan en `local-engine/work`. El usuario debe borrar los archivos que ya no necesite desde esa carpeta.
+
+
+## Presentador hablante gratuito (SadTalker + Piper)
+
+La integración experimental de avatar local está documentada en [AVATAR-ENGINE.md](AVATAR-ENGINE.md). Para activarla, instala SadTalker en un entorno Python 3.8 separado, instala Piper en el entorno `.venv` del motor NINA y configura las rutas copiando `AVATAR-LOCAL-CONFIG.example.bat` a `AVATAR-LOCAL-CONFIG.bat`.
+
+La aplicación mantiene D-ID disponible hasta que se pruebe el resultado local. Consulta `http://127.0.0.1:8765/avatar/status` para comprobar si están instalados SadTalker, sus checkpoints, Piper y las voces.

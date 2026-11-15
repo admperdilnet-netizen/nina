@@ -169,3 +169,17 @@ button{min-height:40px}
 
 /* Keep D-ID diagnostics visible beside the connection controls. */
 .did-live-status{margin:0;padding:8px 10px;border:1px solid rgba(167,139,250,.22);border-radius:8px;background:rgba(12,10,20,.72);color:#e7ddff;font-size:10px;line-height:1.5;overflow-wrap:anywhere;min-height:32px}
+
+
+/* Free local talking-avatar option. */
+.local-avatar-setup{display:flex;flex-direction:column;gap:9px;margin-top:13px;padding:12px;border:1px solid rgba(124,224,167,.25);border-radius:12px;background:rgba(124,224,167,.045)}
+.local-avatar-setup label{display:flex;flex-direction:column;gap:5px;color:#c8c1d4;font-size:9px}
+.local-avatar-setup textarea{width:100%;min-width:0;border:1px solid var(--line);border-radius:8px;background:#171520;color:#f7f5fb;padding:9px;font:inherit;font-size:10px;line-height:1.5;resize:vertical}
+.local-avatar-button{width:100%;border:1px solid rgba(124,224,167,.4);border-radius:9px;background:linear-gradient(100deg,#9be8bb,#b9f0d0);color:#14251b;padding:11px 12px;font-size:10px;font-weight:850;letter-spacing:.06em;cursor:pointer}
+.local-avatar-button:disabled{opacity:.45;cursor:not-allowed}
+.local-avatar-result{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}
+.local-avatar-result a{color:#a9eac2;font-size:10px;text-decoration:underline}
+.avatar-overlay.did-live .did-avatar-video[controls]{pointer-events:auto}
+@media(max-width:600px){.local-avatar-setup{padding:10px}.local-avatar-button{min-height:44px}}
+
+.avatar-overlay.local-live{pointer-events:auto;max-width:220px;width:clamp(120px,var(--avatar-size),220px);aspect-ratio:3/4;overflow:hidden;border-radius:14px}.avatar-overlay.local-live .did-avatar-video{width:100%;height:100%;object-fit:contain;background:#08080c}
