@@ -152,3 +152,10 @@ button{min-height:40px}
 .avatar-overlay.did-live{height:auto;min-height:0;aspect-ratio:auto;overflow:hidden;border-radius:14px}
 .avatar-overlay.did-live .did-avatar-video{width:100%;height:auto;min-height:0;aspect-ratio:inherit;object-fit:contain;object-position:center;background:#08080c}
 .avatar-overlay.did-live .avatar-label{bottom:5px;max-width:calc(100% - 12px);overflow:hidden;text-overflow:ellipsis}
+
+
+/* Keep the presenter visible and ready to receive the live D-ID stream even before a source video is uploaded. */
+.video-stage.presenter-visible .empty-upload{width:calc(100% - 160px);margin-left:160px}
+.video-stage.presenter-visible .avatar-overlay{z-index:3;bottom:12px;left:2.2%;right:auto;pointer-events:none}
+.video-stage.presenter-visible .avatar-overlay .avatar-label{font-size:7px;letter-spacing:.04em;max-width:calc(100% - 8px);white-space:normal;text-align:center;line-height:1.25}
+@media(max-width:600px){.video-stage.presenter-visible .empty-upload{width:calc(100% - 112px);margin-left:112px}.video-stage.presenter-visible .avatar-overlay{left:2%;bottom:10px}}
