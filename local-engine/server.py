@@ -188,7 +188,7 @@ def root() -> dict[str, str]:
 # Configure these paths on the user's PC; no cloud API or paid credits are used.
 SADTALKER_DIR = Path(os.environ.get("NINA_SADTALKER_DIR", APP_DIR / "SadTalker")).resolve()
 SADTALKER_PYTHON = os.environ.get("NINA_SADTALKER_PYTHON", "")
-PIPER_EXE = os.environ.get("NINA_PIPER_EXE", "")
+PIPER_PYTHON = os.environ.get("NINA_PIPER_PYTHON", sys.executable)
 PIPER_FEMALE_MODEL = os.environ.get("NINA_PIPER_FEMALE_MODEL", "")
 PIPER_MALE_MODEL = os.environ.get("NINA_PIPER_MALE_MODEL", "")
 AVATAR_WORK_DIR = WORK_DIR / "avatars"
@@ -199,12 +199,12 @@ MAX_AVATAR_IMAGE_BYTES = 15 * 1024 * 1024
 def avatar_engine_status() -> dict[str, Any]:
     inference = SADTALKER_DIR / "inference.py"
     python_path = SADTALKER_PYTHON or sys.executable
-    female_ready = bool(PIPER_EXE and PIPER_FEMALE_MODEL and Path(PIPER_EXE).is_file() and Path(PIPER_FEMALE_MODEL).is_file())
-    male_ready = bool(PIPER_EXE and PIPER_MALE_MODEL and Path(PIPER_EXE).is_file() and Path(PIPER_MALE_MODEL).is_file())
+    female_ready = bool(PIPER_FEMALE_MODEL and Path(PIPER_PYTHON).is_file() and Path(PIPER_FEMALE_MODEL).is_file())
+    male_ready = bool(PIPER_MALE_MODEL and Path(PIPER_PYTHON).is_file() and Path(PIPER_MALE_MODEL).is_file())
     return {
         "available": inference.is_file() and Path(python_path).is_file() and female_ready and male_ready,
         "sadtalker_ready": inference.is_file(),
-        "piper_ready": bool(PIPER_EXE and Path(PIPER_EXE).is_file()),
+        "piper_ready": Path(PIPER_PYTHON).is_file(),
         "female_voice_ready": female_ready,
         "male_voice_ready": male_ready,
         "sadtalker_dir": str(SADTALKER_DIR),
@@ -261,8 +261,7 @@ def generate_local_avatar(
     voice_model = PIPER_FEMALE_MODEL if gender == "female" else PIPER_MALE_MODEL
     try:
         tts = subprocess.run(
-            [PIPER_EXE, "--model", voice_model, "--output_file", str(audio_path)],
-            input=phrase,
+            [PIPER_PYTHON, "-m", "piper", "-m", voice_model, "-f", str(audio_path), "--", phrase],
             text=True,
             capture_output=True,
             timeout=180,
