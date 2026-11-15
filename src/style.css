@@ -95,3 +95,14 @@ button{min-height:40px}
 .test-voice-button:disabled{opacity:.55;cursor:default}
 @media(max-width:600px){.avatar-overlay{max-width:112px;bottom:43px}.avatar-overlay.left{left:2%}.test-voice-button{margin-left:48px}}
 @media(prefers-reduced-motion:reduce){.avatar-overlay,.avatar-overlay.speaking .avatar-real:before{animation:none!important}}
+
+
+/* Motion and speech feedback for the selected presenter */
+.avatar-overlay{will-change:transform;animation:presenter-idle 3.8s ease-in-out infinite}
+.avatar-real img{transform-origin:50% 70%;animation:presenter-image-idle 4.2s ease-in-out infinite}
+.avatar-overlay.speaking .avatar-real img{animation:presenter-image-talk .72s ease-in-out infinite}
+.avatar-real:before{top:43%;left:50%;width:11px;height:3px;opacity:.9;box-shadow:0 1px 0 rgba(255,220,215,.25)}
+.avatar-overlay.speaking .avatar-real:before{animation:presenter-mouth .22s ease-in-out infinite alternate}
+.avatar-overlay.mouth-open .avatar-real:before{height:8px;width:12px;border-radius:45% 45% 60% 60%;background:#54202a}
+@keyframes presenter-image-idle{0%,100%{transform:translateY(0) scale(1)}50%{transform:translateY(-2px) scale(1.008)}}
+@keyframes presenter-image-talk{0%,100%{transform:translateY(0) rotate(0)}25%{transform:translateY(-1px) rotate(-.4deg)}75%{transform:translateY(1px) rotate(.4deg)}}
