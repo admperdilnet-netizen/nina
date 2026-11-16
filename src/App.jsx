@@ -191,18 +191,40 @@ export default function App() {
         if (main.readyState >= 2) resolve()
         else main.addEventListener('loadeddata', resolve, { once: true })
       })
-      const stream = canvas.captureStream(30)
-      const addAudio = video => {
-        if (!video?.captureStream) return
-        try {
-          const audioStream = video.captureStream()
-          audioStream.getAudioTracks().forEach(track => stream.addTrack(track))
-        } catch {}
+      const stream = canvas.captureStream(60)
+      let audioContext
+      let audioDestination
+      const audioSources = []
+      try {
+        const audioVideos = [main, overlayRef.current].filter(Boolean)
+        if (audioVideos.length) {
+          audioContext = new (window.AudioContext || window.webkitAudioContext)()
+          audioDestination = audioContext.createMediaStreamDestination()
+          audioVideos.forEach(video => {
+            if (!video.captureStream) return
+            const audioTracks = video.captureStream().getAudioTracks()
+            if (!audioTracks.length) return
+            const audioOnlyStream = new MediaStream(audioTracks)
+            const source = audioContext.createMediaStreamSource(audioOnlyStream)
+            source.connect(audioDestination)
+            audioSources.push(source)
+          })
+          if (audioDestination.stream.getAudioTracks().length) {
+            audioDestination.stream.getAudioTracks().forEach(track => stream.addTrack(track))
+            await audioContext.resume()
+          }
+        }
+      } catch (audioError) {
+        console.warn('No se pudo mezclar el audio de ambas capas:', audioError)
       }
-      addAudio(main)
-      addAudio(overlayRef.current)
-      const mime = MediaRecorder.isTypeSupported('video/webm;codecs=vp9,opus') ? 'video/webm;codecs=vp9,opus' : 'video/webm'
-      const recorder = new MediaRecorder(stream, { mimeType: mime })
+      const mime = MediaRecorder.isTypeSupported('video/webm;codecs=vp9,opus')
+        ? 'video/webm;codecs=vp9,opus'
+        : (MediaRecorder.isTypeSupported('video/webm;codecs=vp8,opus') ? 'video/webm;codecs=vp8,opus' : 'video/webm')
+      const recorder = new MediaRecorder(stream, {
+        mimeType: mime,
+        videoBitsPerSecond: 20000000,
+        audioBitsPerSecond: 320000
+      })
       recorderRef.current = recorder
       chunksRef.current = []
       recorder.ondataavailable = event => { if (event.data.size) chunksRef.current.push(event.data) }
@@ -218,6 +240,8 @@ export default function App() {
         setPlaying(false)
         setMessage('¡Video de reacción exportado! Se descargó mi-reaccion-nina.webm.')
         stream.getTracks().forEach(track => track.stop())
+        audioSources.forEach(source => source.disconnect())
+        audioContext?.close().catch(() => {})
       }
       recorder.start(250)
       setExporting(true)
@@ -293,7 +317,7 @@ export default function App() {
             </section>
             <section className="editor-panel export-panel">
               <div className="editor-panel-heading"><div><Download size={18}/><div><strong>Exportar video</strong><small>Descarga tu composición</small></div></div></div>
-              <div className="export-format"><strong>WEBM · 720p / 30 FPS</strong><small>Incluye las dos capas y el audio disponible.</small></div>
+              <div className="export-format"><strong>WEBM · 1080p / 60 FPS</strong><small>Calidad Full HD, 60 FPS y mezcla del audio de ambas capas.</small></div>
               {exporting ? <button className="export-reaction-button stop-export" onClick={stopExport}>Detener exportación</button> : <button className="export-reaction-button" onClick={exportVideo} disabled={!mainUrl}><Download size={17}/> Exportar reacción</button>}
               <p className="editor-message" role="status">{message}</p>
             </section>
@@ -301,7 +325,7 @@ export default function App() {
         </div>
         <footer className="editor-footer">NINA · Editor sencillo de videos de reacción. Tus archivos se procesan en tu navegador.</footer>
       </main>
-      <canvas ref={canvasRef} width="1280" height="720" className="render-canvas" />
+      <canvas ref={canvasRef} width="1920" height="1080" className="render-canvas" />
     </div>
   )
 }
