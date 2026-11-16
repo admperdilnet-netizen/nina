@@ -39,6 +39,7 @@ export default function App() {
   const [duration, setDuration] = useState(0)
   const [currentTime, setCurrentTime] = useState(0)
   const [exporting, setExporting] = useState(false)
+  const [exportDownloadUrl, setExportDownloadUrl] = useState('')
   const [message, setMessage] = useState('Carga dos videos para comenzar tu reacción.')
   const [dragging, setDragging] = useState(false)
   const mainInput = useRef(null)
@@ -254,6 +255,7 @@ export default function App() {
       return
     }
     if (exporting) return
+    setExportDownloadUrl('')
 
     let stream
     let audioContext
@@ -339,6 +341,9 @@ export default function App() {
           setMessage('NINA no recibió datos del video. Comprueba que el video se reproduzca y vuelve a exportar.')
         } else {
           const downloadUrl = URL.createObjectURL(blob)
+          urlsRef.current.push(downloadUrl)
+          setExportDownloadUrl(downloadUrl)
+          // Try the automatic download, but keep a visible manual download link too.
           const link = document.createElement('a')
           link.href = downloadUrl
           link.download = 'Gato-tv-reaccion.webm'
@@ -346,8 +351,7 @@ export default function App() {
           document.body.appendChild(link)
           link.click()
           link.remove()
-          window.setTimeout(() => URL.revokeObjectURL(downloadUrl), 120000)
-          setMessage('¡Exportación terminada! Se descargó Gato-tv-reaccion.webm con la firma Gato-tv.')
+          setMessage('¡Video exportado! Si no comenzó la descarga automáticamente, pulsa el enlace Descargar video que aparece aquí.')
         }
         setExporting(false)
         setPlaying(false)
@@ -490,6 +494,7 @@ export default function App() {
               <div className="export-format"><strong>WEBM · 1080p / 60 FPS</strong><small>Calidad Full HD, 60 FPS y mezcla del audio de ambas capas.</small></div>
               {exporting ? <button className="export-reaction-button stop-export" onClick={stopExport}>Detener exportación</button> : <button className="export-reaction-button" onClick={exportVideo} disabled={!mainUrl}><Download size={17}/> Exportar reacción</button>}
               <p className="editor-message" role="status">{message}</p>
+              {exportDownloadUrl && <a className="export-download-link" href={exportDownloadUrl} download="Gato-tv-reaccion.webm"><Download size={15}/> Descargar video Gato-tv</a>}
             </section>
           </aside>
         </div>
