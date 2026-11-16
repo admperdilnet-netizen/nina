@@ -504,6 +504,10 @@ def dub_and_render_reaction(
             "-c:v", "libx264", "-preset", "veryfast", "-crf", "19",
             "-r", "30", "-pix_fmt", "yuv420p",
             "-c:a", "aac", "-b:a", "192k",
+            "-metadata", "title=Video creado con Gato-tv",
+            "-metadata", "artist=Gato-tv",
+            "-metadata", "copyright=Gato-tv",
+            "-metadata", "comment=Firma de creador Gato-tv; los derechos del material de origen dependen de sus respectivas licencias.",
             "-shortest", "-movflags", "+faststart",
             str(output_path),
         ])
@@ -545,4 +549,4 @@ def download_dubbed_video(job_id: str) -> FileResponse:
     path = WORK_DIR / f"nina-doblado-{job_id}.mp4"
     if not path.is_file():
         raise HTTPException(status_code=404, detail="No se encontró el video doblado.")
-    return FileResponse(path, media_type="video/mp4", filename="NINA-video-doblado.mp4")
+    return FileResponse(path, media_type="video/mp4", filename="Gato-tv-video-doblado.mp4")
