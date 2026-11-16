@@ -3,9 +3,22 @@ setlocal
 cd /d "%~dp0"
 if exist "AVATAR-LOCAL-CONFIG.bat" call "AVATAR-LOCAL-CONFIG.bat"
 title NINA - Instalador y motor local
+
 echo ==========================================
 echo       NINA - INSTALACION AUTOMATICA
 echo ==========================================
+
+rem Evita instalar desde la carpeta temporal que crea WinRAR al abrir un ZIP.
+echo "%CD%" | findstr /i /c:"%TEMP%" >nul
+if not errorlevel 1 (
+  echo.
+  echo ERROR: Estas ejecutando NINA desde el archivo comprimido o una carpeta temporal.
+  echo Extrae TODO el ZIP a una carpeta normal, por ejemplo Documentos\NINA.
+  echo Luego abre local-engine\INICIAR-NINA.bat desde esa carpeta.
+  pause
+  exit /b 1
+)
+
 where py >nul 2>nul
 if errorlevel 1 (
   echo No se encontro el lanzador de Python.
@@ -32,13 +45,16 @@ if not exist ".venv\Scripts\python.exe" (
 echo [2/4] Actualizando lista de componentes...
 where curl >nul 2>nul
 if not errorlevel 1 (
-  curl -fL --retry 2 --connect-timeout 15 "https://raw.githubusercontent.com/admperdilnet-netizen/nina/main/local-engine/requirements.txt" -o "requirements-latest.txt"
+  curl -fL --retry 4 --retry-delay 3 --connect-timeout 30 --max-time 180 "https://raw.githubusercontent.com/admperdilnet-netizen/nina/main/local-engine/requirements.txt" -o "requirements-latest.txt"
   if not errorlevel 1 move /y "requirements-latest.txt" "requirements.txt" >nul
 )
 if exist "requirements-latest.txt" del "requirements-latest.txt"
-echo [3/4] Instalando componentes necesarios (solo la primera vez o si hay cambios)...
-".venv\Scripts\python.exe" -m pip install -r requirements.txt
+
+echo [3/4] Instalando componentes. Puede tardar y descargar archivos grandes.
+echo Si la conexion se interrumpe, vuelve a abrir este mismo archivo: pip reintentara las descargas.
+".venv\Scripts\python.exe" -m pip install --disable-pip-version-check --retries 10 --timeout 120 --prefer-binary -r requirements.txt
 if errorlevel 1 goto error
+
 set OMP_NUM_THREADS=1
 set OPENBLAS_NUM_THREADS=1
 set MKL_NUM_THREADS=1
@@ -49,15 +65,16 @@ echo.
 echo [4/4] Iniciando NINA...
 echo Motor local: http://127.0.0.1:8765
 echo Estado: http://127.0.0.1:8765/health
-echo Mantén esta ventana abierta mientras uses el motor.
+echo Manten esta ventana abierta mientras uses el motor.
 echo Para detenerlo, cierra esta ventana.
 echo.
 ".venv\Scripts\python.exe" -m uvicorn server:app --host 127.0.0.1 --port 8765 --workers 1 --limit-concurrency 2
 goto end
+
 :error
 echo.
-echo Hubo un error durante la instalacion.
-echo No cierres ni borres archivos. Copia el mensaje de error.
+echo La instalacion no termino. Revisa tu conexion a Internet y vuelve a abrir este archivo.
+echo Se aumentaron los reintentos y el tiempo de espera; no necesitas borrar la carpeta .venv.
 pause
 :end
 endlocal
