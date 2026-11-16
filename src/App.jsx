@@ -255,7 +255,10 @@ export default function App() {
       return
     }
     if (exporting) return
+    // Give immediate feedback so the user can see the button was activated.
+    setExporting(true)
     setExportDownloadUrl('')
+    setMessage('Preparando la exportación…')
 
     let stream
     let audioContext
@@ -268,29 +271,40 @@ export default function App() {
       if (audioContext && audioContext.state !== 'closed') audioContext.close().catch(() => {})
     }
 
+    const waitFor = (element, eventName, timeoutMs, errorText) => new Promise((resolve, reject) => {
+      const timer = window.setTimeout(() => {
+        cleanup()
+        reject(new Error(errorText))
+      }, timeoutMs)
+      const cleanup = () => {
+        window.clearTimeout(timer)
+        element.removeEventListener(eventName, onReady)
+        element.removeEventListener('error', onError)
+      }
+      const onReady = () => { cleanup(); resolve() }
+      const onError = () => { cleanup(); reject(new Error(errorText)) }
+      element.addEventListener(eventName, onReady, { once: true })
+      element.addEventListener('error', onError, { once: true })
+    })
+
     try {
       main.pause()
       overlay?.pause()
-      if (main.currentTime !== 0) {
-        const reset = new Promise((resolve, reject) => {
-          const timer = window.setTimeout(() => reject(new Error('El video tardó demasiado en volver al inicio.')), 10000)
-          main.addEventListener('seeked', () => { window.clearTimeout(timer); resolve() }, { once: true })
-        })
+      setMessage('Preparando los videos y el sonido…')
+      if (main.readyState < 2) await waitFor(main, 'loadeddata', 20000, 'El video principal no terminó de cargar. Prueba con MP4 H.264.')
+      if (overlay && overlay.readyState < 2) await waitFor(overlay, 'loadeddata', 20000, 'El video de reacción no terminó de cargar. Prueba con MP4 H.264.')
+      if (main.currentTime > 0.05) {
+        const seeked = waitFor(main, 'seeked', 10000, 'El video principal no pudo volver al inicio.')
         main.currentTime = 0
-        await reset
+        await seeked
       }
-      if (overlay && overlay.currentTime !== 0) {
+      if (overlay && overlay.currentTime > 0.05) {
+        const seeked = waitFor(overlay, 'seeked', 10000, 'El video de reacción no pudo volver al inicio.')
         overlay.currentTime = 0
-        await new Promise(resolve => overlay.addEventListener('seeked', resolve, { once: true }))
-      }
-      if (main.readyState < 2) {
-        await new Promise((resolve, reject) => {
-          const timer = window.setTimeout(() => reject(new Error('El video principal no terminó de cargar.')), 15000)
-          main.addEventListener('loadeddata', () => { window.clearTimeout(timer); resolve() }, { once: true })
-          main.addEventListener('error', () => { window.clearTimeout(timer); reject(new Error('No se pudo leer el video principal.')) }, { once: true })
-        })
+        await seeked
       }
 
+      setMessage('Iniciando la grabación de tu reacción…')
       stream = canvas.captureStream(30)
       try {
         const AudioContextClass = window.AudioContext || window.webkitAudioContext
@@ -367,7 +381,6 @@ export default function App() {
       }
       main.addEventListener('ended', endedHandler, { once: true })
       recorder.start(1000)
-      setExporting(true)
       setMessage('Exportando tu reacción. Espera a que termine el video o pulsa Detener exportación.')
       await main.play()
       if (overlay) await overlay.play().catch(() => {
@@ -384,6 +397,7 @@ export default function App() {
         setExporting(false)
       }
       setPlaying(false)
+      setExporting(false)
       setMessage('No se pudo exportar: ' + (error?.message || 'error del navegador'))
     }
   }
