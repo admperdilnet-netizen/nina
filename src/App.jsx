@@ -77,6 +77,18 @@ export default function App() {
           ctx.strokeRect(canvas.width * overlayX / 100, canvas.height * overlayY / 100, w, h)
           ctx.restore()
         }
+        // Permanent creator signature: burned into every canvas-based export.
+        ctx.save()
+        ctx.font = 'bold 34px Arial, sans-serif'
+        ctx.textAlign = 'right'
+        ctx.textBaseline = 'bottom'
+        ctx.lineJoin = 'round'
+        ctx.lineWidth = 6
+        ctx.strokeStyle = 'rgba(0,0,0,0.72)'
+        ctx.fillStyle = 'rgba(255,255,255,0.88)'
+        ctx.strokeText('Gato-tv', canvas.width - 42, canvas.height - 34)
+        ctx.fillText('Gato-tv', canvas.width - 42, canvas.height - 34)
+        ctx.restore()
       }
       frame = requestAnimationFrame(draw)
     }
@@ -274,12 +286,12 @@ export default function App() {
         const downloadUrl = URL.createObjectURL(blob)
         const link = document.createElement('a')
         link.href = downloadUrl
-        link.download = 'mi-reaccion-nina.webm'
+        link.download = 'Gato-tv-reaccion.webm'
         link.click()
         setTimeout(() => URL.revokeObjectURL(downloadUrl), 60000)
         setExporting(false)
         setPlaying(false)
-        setMessage('¡Video de reacción exportado! Se descargó mi-reaccion-nina.webm.')
+        setMessage('¡Video de reacción exportado! Se descargó Gato-tv-reaccion.webm. Firma Gato-tv incluida.')
         stream.getTracks().forEach(track => track.stop())
         audioSources.forEach(source => source.disconnect())
         audioContext?.close().catch(() => {})
