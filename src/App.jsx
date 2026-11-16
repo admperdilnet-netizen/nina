@@ -115,8 +115,11 @@ export default function App() {
   }, [mainUrl, overlayUrl, overlaySize, overlayX, overlayY, overlayOpacity, filterBrightness, filterContrast, filterSaturation, filterSepia, filterBlur])
 
   function loadFile(file, layer) {
-    if (!file || !file.type.startsWith('video/')) {
-      setMessage('Selecciona un archivo de video válido.')
+    // iOS Files/Photos can provide an empty or generic MIME type for valid MOV/MP4 files.
+    const videoExtension = /\\.(mp4|m4v|mov|webm|ogv|ogg|3gp|3g2|mkv|avi)$/i.test(file?.name || '')
+    const videoMime = /^video\\//i.test(file?.type || '')
+    if (!file || (!videoMime && !videoExtension)) {
+      setMessage('No pude reconocer ese archivo como video. Prueba con MP4 o MOV.')
       return
     }
     const url = URL.createObjectURL(file)
@@ -128,13 +131,13 @@ export default function App() {
       setMainName(file.name)
       setPlaying(false)
       setCurrentTime(0)
-      setMessage('Video principal cargado. Ahora añade tu video de reacción.')
+      setMessage('Video seleccionado. NINA está comprobando si Safari puede reproducirlo…')
     } else {
       setOverlayFile(file)
       setDubbedUrl('')
       setOverlayUrl(url)
       setOverlayName(file.name)
-      setMessage('Video de reacción cargado. Puedes moverlo y cambiar su tamaño.')
+      setMessage('Video de reacción seleccionado. NINA está comprobando si Safari puede reproducirlo…')
     }
   }
 
@@ -427,8 +430,8 @@ export default function App() {
             <div className="editor-panel">
               <div className="editor-panel-heading"><div><Film size={18}/><div><strong>Vista previa</strong><small>Arrastra el video pequeño para colocarlo donde quieras.</small></div></div><span className="preview-tag">16:9</span></div>
               <div className="reaction-stage" ref={stageRef} onPointerMove={moveDrag} onPointerUp={stopDrag} onPointerCancel={stopDrag} onPointerLeave={stopDrag}>
-                {mainUrl ? <video ref={mainRef} src={mainUrl} playsInline preload="auto" style={{ filter: videoFilter }} onLoadedMetadata={e => setDuration(e.currentTarget.duration || 0)} onTimeUpdate={e => { const time = e.currentTarget.currentTime; setCurrentTime(time); const overlay = overlayRef.current; if (overlay && Number.isFinite(overlay.duration) && Math.abs(overlay.currentTime - time) > 0.35) { try { overlay.currentTime = Math.min(time, Math.max(0, overlay.duration - 0.05)) } catch {} } }} onSeeking={e => { const overlay = overlayRef.current; if (overlay && Number.isFinite(overlay.duration)) { try { overlay.currentTime = Math.min(e.currentTarget.currentTime, Math.max(0, overlay.duration - 0.05)) } catch {} } }} onEnded={() => { overlayRef.current?.pause(); setPlaying(false) }} /> : <button className="stage-empty" onClick={() => mainInput.current?.click()}><Upload size={30}/><strong>Sube el video principal</strong><span>El video que vas a comentar</span></button>}
-                {overlayUrl && <div className={'reaction-overlay ' + (dragging ? 'dragging' : '')} style={{ left: overlayX + '%', top: overlayY + '%', width: overlaySize + '%', opacity: overlayOpacity / 100 }} onPointerDown={startDrag}><video ref={overlayRef} src={overlayUrl} playsInline muted={false} preload="auto" style={{ filter: videoFilter }} onLoadedMetadata={e => { const main = mainRef.current; if (main && Number.isFinite(e.currentTarget.duration)) { try { e.currentTarget.currentTime = Math.min(main.currentTime, Math.max(0, e.currentTarget.duration - 0.05)) } catch {} } }} onError={() => setMessage('No se pudo cargar el video de reacción. Usa MP4 H.264 para mayor compatibilidad.')}/><span><Move size={12}/> TU REACCIÓN</span></div>}
+                {mainUrl ? <video ref={mainRef} src={mainUrl} playsInline webkit-playsinline="true" controls preload="metadata" style={{ filter: videoFilter }} onLoadedMetadata={e => { setDuration(e.currentTarget.duration || 0); setMessage("Video principal listo para reproducirse.") }} onCanPlay={() => setMessage("Video principal listo para reproducirse.")} onError={e => { const code = e.currentTarget.error?.code; setMessage(code === 4 ? "Safari no reconoce el códec de este video. Convierte el archivo a MP4 H.264 y vuelve a cargarlo." : "Safari no pudo abrir el video. Prueba guardarlo en Archivos y seleccionarlo de nuevo.") }} onTimeUpdate={e => { const time = e.currentTarget.currentTime; setCurrentTime(time); const overlay = overlayRef.current; if (overlay && Number.isFinite(overlay.duration) && Math.abs(overlay.currentTime - time) > 0.35) { try { overlay.currentTime = Math.min(time, Math.max(0, overlay.duration - 0.05)) } catch {} } }} onSeeking={e => { const overlay = overlayRef.current; if (overlay && Number.isFinite(overlay.duration)) { try { overlay.currentTime = Math.min(e.currentTarget.currentTime, Math.max(0, overlay.duration - 0.05)) } catch {} } }} onEnded={() => { overlayRef.current?.pause(); setPlaying(false) }} /> : <button className="stage-empty" onClick={() => mainInput.current?.click()}><Upload size={30}/><strong>Sube el video principal</strong><span>El video que vas a comentar</span></button>}
+                {overlayUrl && <div className={'reaction-overlay ' + (dragging ? 'dragging' : '')} style={{ left: overlayX + '%', top: overlayY + '%', width: overlaySize + '%', opacity: overlayOpacity / 100 }} onPointerDown={startDrag}><video ref={overlayRef} src={overlayUrl} playsInline webkit-playsinline="true" muted={false} preload="metadata" style={{ filter: videoFilter }} onLoadedMetadata={e => { const main = mainRef.current; if (main && Number.isFinite(e.currentTarget.duration)) { try { e.currentTarget.currentTime = Math.min(main.currentTime, Math.max(0, e.currentTarget.duration - 0.05)) } catch {} } }} onError={() => setMessage('No se pudo cargar el video de reacción. Usa MP4 H.264 para mayor compatibilidad.')}/><span><Move size={12}/> TU REACCIÓN</span></div>}
                 {!overlayUrl && mainUrl && <button className="add-overlay-hint" onClick={() => overlayInput.current?.click()}><Upload size={17}/> Añadir video de reacción</button>}
               </div>
               <div className="editor-transport">
