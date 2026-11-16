@@ -21,6 +21,21 @@ export default function App() {
   const [overlayOpacity, setOverlayOpacity] = useState(100)
   const [mainVolume, setMainVolume] = useState(100)
   const [overlayVolume, setOverlayVolume] = useState(100)
+  const [filterPreset, setFilterPreset] = useState('normal')
+  const [filterBrightness, setFilterBrightness] = useState(100)
+  const [filterContrast, setFilterContrast] = useState(100)
+  const [filterSaturation, setFilterSaturation] = useState(100)
+  const [filterSepia, setFilterSepia] = useState(0)
+  const [filterBlur, setFilterBlur] = useState(0)
+  const filterPresets = {
+    normal: { brightness: 100, contrast: 100, saturation: 100, sepia: 0 },
+    vivid: { brightness: 108, contrast: 115, saturation: 145, sepia: 0 },
+    cinematic: { brightness: 92, contrast: 125, saturation: 85, sepia: 12 },
+    mono: { brightness: 100, contrast: 115, saturation: 0, sepia: 0 },
+    retro: { brightness: 105, contrast: 95, saturation: 85, sepia: 38 },
+    warm: { brightness: 105, contrast: 105, saturation: 120, sepia: 22 }
+  }
+  const videoFilter = `brightness(${filterBrightness}%) contrast(${filterContrast}%) saturate(${filterSaturation}%) sepia(${filterSepia}%) blur(${filterBlur}px)`
   const [duration, setDuration] = useState(0)
   const [currentTime, setCurrentTime] = useState(0)
   const [exporting, setExporting] = useState(false)
@@ -55,7 +70,9 @@ export default function App() {
       const scale = Math.min(w / video.videoWidth, h / video.videoHeight)
       const dw = video.videoWidth * scale
       const dh = video.videoHeight * scale
+      ctx.filter = `brightness(${filterBrightness}%) contrast(${filterContrast}%) saturate(${filterSaturation}%) sepia(${filterSepia}%) blur(${filterBlur}px)`
       ctx.drawImage(video, x + (w - dw) / 2, y + (h - dh) / 2, dw, dh)
+      ctx.filter = 'none'
     }
     const draw = () => {
       if (ctx && canvas) {
@@ -94,7 +111,7 @@ export default function App() {
     }
     draw()
     return () => cancelAnimationFrame(frame)
-  }, [mainUrl, overlayUrl, overlaySize, overlayX, overlayY, overlayOpacity])
+  }, [mainUrl, overlayUrl, overlaySize, overlayX, overlayY, overlayOpacity, filterBrightness, filterContrast, filterSaturation, filterSepia, filterBlur])
 
   function loadFile(file, layer) {
     if (!file || !file.type.startsWith('video/')) {
@@ -392,8 +409,8 @@ export default function App() {
             <div className="editor-panel">
               <div className="editor-panel-heading"><div><Film size={18}/><div><strong>Vista previa</strong><small>Arrastra el video pequeño para colocarlo donde quieras.</small></div></div><span className="preview-tag">16:9</span></div>
               <div className="reaction-stage" ref={stageRef} onPointerMove={moveDrag} onPointerUp={stopDrag} onPointerCancel={stopDrag} onPointerLeave={stopDrag}>
-                {mainUrl ? <video ref={mainRef} src={mainUrl} playsInline preload="auto" onLoadedMetadata={e => setDuration(e.currentTarget.duration || 0)} onTimeUpdate={e => { const time = e.currentTarget.currentTime; setCurrentTime(time); const overlay = overlayRef.current; if (overlay && Number.isFinite(overlay.duration) && Math.abs(overlay.currentTime - time) > 0.35) { try { overlay.currentTime = Math.min(time, Math.max(0, overlay.duration - 0.05)) } catch {} } }} onSeeking={e => { const overlay = overlayRef.current; if (overlay && Number.isFinite(overlay.duration)) { try { overlay.currentTime = Math.min(e.currentTarget.currentTime, Math.max(0, overlay.duration - 0.05)) } catch {} } }} onEnded={() => { overlayRef.current?.pause(); setPlaying(false) }} /> : <button className="stage-empty" onClick={() => mainInput.current?.click()}><Upload size={30}/><strong>Sube el video principal</strong><span>El video que vas a comentar</span></button>}
-                {overlayUrl && <div className={'reaction-overlay ' + (dragging ? 'dragging' : '')} style={{ left: overlayX + '%', top: overlayY + '%', width: overlaySize + '%', opacity: overlayOpacity / 100 }} onPointerDown={startDrag}><video ref={overlayRef} src={overlayUrl} playsInline muted={false} preload="auto" onLoadedMetadata={e => { const main = mainRef.current; if (main && Number.isFinite(e.currentTarget.duration)) { try { e.currentTarget.currentTime = Math.min(main.currentTime, Math.max(0, e.currentTarget.duration - 0.05)) } catch {} } }} onError={() => setMessage('No se pudo cargar el video de reacción. Usa MP4 H.264 para mayor compatibilidad.')}/><span><Move size={12}/> TU REACCIÓN</span></div>}
+                {mainUrl ? <video ref={mainRef} src={mainUrl} playsInline preload="auto" style={{ filter: videoFilter }} onLoadedMetadata={e => setDuration(e.currentTarget.duration || 0)} onTimeUpdate={e => { const time = e.currentTarget.currentTime; setCurrentTime(time); const overlay = overlayRef.current; if (overlay && Number.isFinite(overlay.duration) && Math.abs(overlay.currentTime - time) > 0.35) { try { overlay.currentTime = Math.min(time, Math.max(0, overlay.duration - 0.05)) } catch {} } }} onSeeking={e => { const overlay = overlayRef.current; if (overlay && Number.isFinite(overlay.duration)) { try { overlay.currentTime = Math.min(e.currentTarget.currentTime, Math.max(0, overlay.duration - 0.05)) } catch {} } }} onEnded={() => { overlayRef.current?.pause(); setPlaying(false) }} /> : <button className="stage-empty" onClick={() => mainInput.current?.click()}><Upload size={30}/><strong>Sube el video principal</strong><span>El video que vas a comentar</span></button>}
+                {overlayUrl && <div className={'reaction-overlay ' + (dragging ? 'dragging' : '')} style={{ left: overlayX + '%', top: overlayY + '%', width: overlaySize + '%', opacity: overlayOpacity / 100 }} onPointerDown={startDrag}><video ref={overlayRef} src={overlayUrl} playsInline muted={false} preload="auto" style={{ filter: videoFilter }} onLoadedMetadata={e => { const main = mainRef.current; if (main && Number.isFinite(e.currentTarget.duration)) { try { e.currentTarget.currentTime = Math.min(main.currentTime, Math.max(0, e.currentTarget.duration - 0.05)) } catch {} } }} onError={() => setMessage('No se pudo cargar el video de reacción. Usa MP4 H.264 para mayor compatibilidad.')}/><span><Move size={12}/> TU REACCIÓN</span></div>}
                 {!overlayUrl && mainUrl && <button className="add-overlay-hint" onClick={() => overlayInput.current?.click()}><Upload size={17}/> Añadir video de reacción</button>}
               </div>
               <div className="editor-transport">
@@ -421,6 +438,34 @@ export default function App() {
               <div className="audio-heading"><Volume2 size={16}/> Mezcla de audio</div>
               <label className="control-label"><span>Video principal</span><b>{mainVolume}%</b><input type="range" min="0" max="100" value={mainVolume} onChange={e => setMainVolume(Number(e.target.value))}/></label>
               <label className="control-label"><span>Video de reacción</span><b>{overlayVolume}%</b><input type="range" min="0" max="100" value={overlayVolume} onChange={e => setOverlayVolume(Number(e.target.value))}/></label>
+            </section>
+            <section className="editor-panel filters-panel">
+              <div className="editor-panel-heading"><div><Film size={18}/><div><strong>Filtros y efectos</strong><small>Elige un estilo y ajusta la imagen</small></div></div></div>
+              <label className="control-label"><span>Estilo</span>
+                <select value={filterPreset} onChange={e => {
+                  const preset = e.target.value
+                  setFilterPreset(preset)
+                  const values = filterPresets[preset]
+                  setFilterBrightness(values.brightness)
+                  setFilterContrast(values.contrast)
+                  setFilterSaturation(values.saturation)
+                  setFilterSepia(values.sepia)
+                  setFilterBlur(0)
+                }}>
+                  <option value="normal">Original</option>
+                  <option value="vivid">Vibrante</option>
+                  <option value="cinematic">Cinematográfico</option>
+                  <option value="mono">Blanco y negro</option>
+                  <option value="retro">Retro</option>
+                  <option value="warm">Cálido</option>
+                </select>
+              </label>
+              <label className="control-label"><span>Brillo</span><b>{filterBrightness}%</b><input type="range" min="50" max="160" value={filterBrightness} onChange={e => {setFilterBrightness(Number(e.target.value));setFilterPreset('personalizado')}}/></label>
+              <label className="control-label"><span>Contraste</span><b>{filterContrast}%</b><input type="range" min="50" max="160" value={filterContrast} onChange={e => {setFilterContrast(Number(e.target.value));setFilterPreset('personalizado')}}/></label>
+              <label className="control-label"><span>Saturación</span><b>{filterSaturation}%</b><input type="range" min="0" max="200" value={filterSaturation} onChange={e => {setFilterSaturation(Number(e.target.value));setFilterPreset('personalizado')}}/></label>
+              <label className="control-label"><span>Tono sepia</span><b>{filterSepia}%</b><input type="range" min="0" max="100" value={filterSepia} onChange={e => {setFilterSepia(Number(e.target.value));setFilterPreset('personalizado')}}/></label>
+              <label className="control-label"><span>Desenfoque</span><b>{filterBlur}px</b><input type="range" min="0" max="5" step="0.5" value={filterBlur} onChange={e => {setFilterBlur(Number(e.target.value));setFilterPreset('personalizado')}}/></label>
+              <button className="layer-add" style={{width:'100%',justifyContent:'center'}} onClick={() => {setFilterPreset('normal');setFilterBrightness(100);setFilterContrast(100);setFilterSaturation(100);setFilterSepia(0);setFilterBlur(0)}}>Restablecer filtros</button>
             </section>
             <section className="editor-panel dub-panel">
               <div className="editor-panel-heading"><div><Volume2 size={18}/><div><strong>Doblaje y subtítulos automáticos</strong><small>Traduce las voces de los dos videos</small></div></div></div>
