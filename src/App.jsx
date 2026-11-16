@@ -7,6 +7,13 @@ export default function App() {
   const [overlayUrl, setOverlayUrl] = useState('')
   const [mainName, setMainName] = useState('')
   const [overlayName, setOverlayName] = useState('')
+  const [mainFile, setMainFile] = useState(null)
+  const [overlayFile, setOverlayFile] = useState(null)
+  const [dubLanguage, setDubLanguage] = useState('es')
+  const [subtitlesEnabled, setSubtitlesEnabled] = useState(true)
+  const [dubBusy, setDubBusy] = useState(false)
+  const [dubbedUrl, setDubbedUrl] = useState('')
+  const [dubDownloadUrl, setDubDownloadUrl] = useState('')
   const [playing, setPlaying] = useState(false)
   const [overlaySize, setOverlaySize] = useState(30)
   const [overlayX, setOverlayX] = useState(66)
@@ -85,12 +92,16 @@ export default function App() {
     const url = URL.createObjectURL(file)
     urlsRef.current.push(url)
     if (layer === 'main') {
+      setMainFile(file)
+      setDubbedUrl('')
       setMainUrl(url)
       setMainName(file.name)
       setPlaying(false)
       setCurrentTime(0)
       setMessage('Video principal cargado. Ahora añade tu video de reacción.')
     } else {
+      setOverlayFile(file)
+      setDubbedUrl('')
       setOverlayUrl(url)
       setOverlayName(file.name)
       setMessage('Video de reacción cargado. Puedes moverlo y cambiar su tamaño.')
@@ -169,6 +180,36 @@ export default function App() {
   function stopDrag() {
     dragRef.current = null
     setDragging(false)
+  }
+
+
+  async function createDubbedVideo() {
+    if (!mainFile || !overlayFile) {
+      setMessage('Carga el video principal y el video de reacción para doblarlos.')
+      return
+    }
+    setDubBusy(true)
+    setMessage('NINA está reconociendo las voces, traduciendo y creando los subtítulos. La primera vez puede tardar.')
+    try {
+      const data = new FormData()
+      data.append('main_video', mainFile)
+      data.append('reaction_video', overlayFile)
+      data.append('language', dubLanguage)
+      data.append('overlay_x', String(overlayX))
+      data.append('overlay_y', String(overlayY))
+      data.append('overlay_size', String(overlaySize))
+      data.append('subtitles', String(subtitlesEnabled))
+      const response = await fetch('http://127.0.0.1:8765/dub-render', { method: 'POST', body: data })
+      const result = await response.json().catch(() => ({}))
+      if (!response.ok) throw new Error(result.detail || 'No se pudo generar el doblaje. Abre el motor local de NINA.')
+      setDubbedUrl(result.video_url)
+      setDubDownloadUrl(result.download_url)
+      setMessage('¡Doblaje terminado! El audio original se eliminó y los subtítulos se incorporaron al video.')
+    } catch (error) {
+      setMessage(error.message || 'No se pudo conectar con el motor local. Abre INICIAR-NINA.bat y vuelve a intentarlo.')
+    } finally {
+      setDubBusy(false)
+    }
   }
 
   async function exportVideo() {
@@ -297,8 +338,8 @@ export default function App() {
             </div>
             <div className="editor-panel layers-panel">
               <div className="editor-panel-heading"><div><Move size={18}/><div><strong>Capas de video</strong><small>Dos videos en una sola composición</small></div></div></div>
-              <div className="layer-row"><div className="layer-number">1</div><div className="layer-info"><strong>Video principal</strong><small>{mainName || 'Todavía no has cargado un video'}</small></div><button className="layer-add" onClick={() => mainInput.current?.click()}><Upload size={15}/> {mainUrl ? 'Cambiar' : 'Cargar'}</button>{mainUrl && <button className="layer-remove" title="Quitar video principal" onClick={() => { mainRef.current?.pause(); setMainUrl(''); setMainName(''); setDuration(0); setCurrentTime(0); setPlaying(false) }}><X size={16}/></button>}</div>
-              <div className="layer-row"><div className="layer-number overlay-number">2</div><div className="layer-info"><strong>Video superpuesto / reacción</strong><small>{overlayName || 'Tu cámara, reacción u otro video'}</small></div><button className="layer-add" onClick={() => overlayInput.current?.click()}><Upload size={15}/> {overlayUrl ? 'Cambiar' : 'Cargar'}</button>{overlayUrl && <button className="layer-remove" title="Quitar superposición" onClick={() => { overlayRef.current?.pause(); setOverlayUrl(''); setOverlayName('') }}><X size={16}/></button>}</div>
+              <div className="layer-row"><div className="layer-number">1</div><div className="layer-info"><strong>Video principal</strong><small>{mainName || 'Todavía no has cargado un video'}</small></div><button className="layer-add" onClick={() => mainInput.current?.click()}><Upload size={15}/> {mainUrl ? 'Cambiar' : 'Cargar'}</button>{mainUrl && <button className="layer-remove" title="Quitar video principal" onClick={() => { mainRef.current?.pause(); setMainUrl(''); setMainFile(null); setMainName(''); setDuration(0); setCurrentTime(0); setPlaying(false) }}><X size={16}/></button>}</div>
+              <div className="layer-row"><div className="layer-number overlay-number">2</div><div className="layer-info"><strong>Video superpuesto / reacción</strong><small>{overlayName || 'Tu cámara, reacción u otro video'}</small></div><button className="layer-add" onClick={() => overlayInput.current?.click()}><Upload size={15}/> {overlayUrl ? 'Cambiar' : 'Cargar'}</button>{overlayUrl && <button className="layer-remove" title="Quitar superposición" onClick={() => { overlayRef.current?.pause(); setOverlayUrl(''); setOverlayFile(null); setOverlayName('') }}><X size={16}/></button>}</div>
               <input ref={mainInput} type="file" accept="video/*" hidden onChange={e => loadFile(e.target.files?.[0], 'main')}/>
               <input ref={overlayInput} type="file" accept="video/*" hidden onChange={e => loadFile(e.target.files?.[0], 'overlay')}/>
             </div>
@@ -314,6 +355,23 @@ export default function App() {
               <div className="audio-heading"><Volume2 size={16}/> Mezcla de audio</div>
               <label className="control-label"><span>Video principal</span><b>{mainVolume}%</b><input type="range" min="0" max="100" value={mainVolume} onChange={e => setMainVolume(Number(e.target.value))}/></label>
               <label className="control-label"><span>Video de reacción</span><b>{overlayVolume}%</b><input type="range" min="0" max="100" value={overlayVolume} onChange={e => setOverlayVolume(Number(e.target.value))}/></label>
+            </section>
+            <section className="editor-panel dub-panel">
+              <div className="editor-panel-heading"><div><Volume2 size={18}/><div><strong>Doblaje y subtítulos automáticos</strong><small>Traduce las voces de los dos videos</small></div></div></div>
+              <label className="control-label"><span>Idioma del doblaje</span>
+                <select value={dubLanguage} onChange={e => { setDubLanguage(e.target.value); setDubbedUrl('') }}>
+                  <option value="es">Español</option>
+                  <option value="en">Inglés</option>
+                  <option value="fr">Francés</option>
+                  <option value="pt">Portugués</option>
+                </select>
+              </label>
+              <label className="subtitle-toggle"><input type="checkbox" checked={subtitlesEnabled} onChange={e => setSubtitlesEnabled(e.target.checked)}/> Añadir subtítulos automáticamente</label>
+              <button className="export-reaction-button dub-button" onClick={createDubbedVideo} disabled={!mainFile || !overlayFile || dubBusy}>
+                {dubBusy ? 'Procesando doblaje y subtítulos…' : 'Doblar y crear subtítulos'}
+              </button>
+              {dubbedUrl && <div className="dub-result"><strong>Video doblado listo</strong><video controls playsInline src={dubbedUrl}/><a href={dubDownloadUrl}>Descargar video doblado</a></div>}
+              <p className="dub-note">Necesita el motor local de NINA abierto en tu PC. Requiere conexión a internet para traducir y generar la voz.</p>
             </section>
             <section className="editor-panel export-panel">
               <div className="editor-panel-heading"><div><Download size={18}/><div><strong>Exportar video</strong><small>Descarga tu composición</small></div></div></div>
