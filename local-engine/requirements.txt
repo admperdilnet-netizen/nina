@@ -4,3 +4,6 @@ python-multipart==0.0.20
 imageio-ffmpeg==0.6.0
 psutil==6.1.1
 piper-tts==1.8.0
+faster-whisper==1.1.1
+deep-translator==1.11.4
+edge-tts==7.2.0
