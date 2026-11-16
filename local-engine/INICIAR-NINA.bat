@@ -15,10 +15,14 @@ if errorlevel 1 (
 )
 py -3.11 --version >nul 2>nul
 if errorlevel 1 (
-  echo No se encontro Python 3.11.
-  echo Ejecuta: py install 3.11
-  pause
-  exit /b 1
+  echo Descargando Python 3.11 necesario para el motor de doblaje...
+  py install 3.11
+  if errorlevel 1 (
+    echo No se pudo instalar Python 3.11 automaticamente.
+    echo Instala Python 3.11 desde python.org y vuelve a abrir este archivo.
+    pause
+    exit /b 1
+  )
 )
 if not exist ".venv\Scripts\python.exe" (
   echo [1/4] Preparando entorno de NINA...
