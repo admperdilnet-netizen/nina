@@ -226,6 +226,7 @@ export default function App() {
 
   async function exportVideo() {
     const main = mainRef.current
+    const overlay = overlayRef.current
     const canvas = canvasRef.current
     if (!main || !mainUrl) {
       setMessage('Carga el video principal antes de exportar.')
@@ -235,80 +236,133 @@ export default function App() {
       setMessage('Tu navegador no permite exportar video desde este editor. Usa Chrome actualizado.')
       return
     }
+    if (exporting) return
+
+    let stream
+    let audioContext
+    let audioSources = []
+    let recorder
+    let endedHandler
+    const cleanAudio = () => {
+      audioSources.forEach(source => { try { source.disconnect() } catch {} })
+      audioSources = []
+      if (audioContext && audioContext.state !== 'closed') audioContext.close().catch(() => {})
+    }
+
     try {
       main.pause()
-      overlayRef.current?.pause()
-      main.currentTime = 0
-      if (overlayRef.current) overlayRef.current.currentTime = 0
-      await new Promise(resolve => {
-        if (main.readyState >= 2) resolve()
-        else main.addEventListener('loadeddata', resolve, { once: true })
-      })
-      const stream = canvas.captureStream(60)
-      let audioContext
-      let audioDestination
-      const audioSources = []
+      overlay?.pause()
+      if (main.currentTime !== 0) {
+        const reset = new Promise((resolve, reject) => {
+          const timer = window.setTimeout(() => reject(new Error('El video tardó demasiado en volver al inicio.')), 10000)
+          main.addEventListener('seeked', () => { window.clearTimeout(timer); resolve() }, { once: true })
+        })
+        main.currentTime = 0
+        await reset
+      }
+      if (overlay && overlay.currentTime !== 0) {
+        overlay.currentTime = 0
+        await new Promise(resolve => overlay.addEventListener('seeked', resolve, { once: true }))
+      }
+      if (main.readyState < 2) {
+        await new Promise((resolve, reject) => {
+          const timer = window.setTimeout(() => reject(new Error('El video principal no terminó de cargar.')), 15000)
+          main.addEventListener('loadeddata', () => { window.clearTimeout(timer); resolve() }, { once: true })
+          main.addEventListener('error', () => { window.clearTimeout(timer); reject(new Error('No se pudo leer el video principal.')) }, { once: true })
+        })
+      }
+
+      stream = canvas.captureStream(30)
       try {
-        const audioVideos = [main, overlayRef.current].filter(Boolean)
-        if (audioVideos.length) {
-          audioContext = new (window.AudioContext || window.webkitAudioContext)()
-          audioDestination = audioContext.createMediaStreamDestination()
-          audioVideos.forEach(video => {
-            if (!video.captureStream) return
-            const audioTracks = video.captureStream().getAudioTracks()
-            if (!audioTracks.length) return
-            const audioOnlyStream = new MediaStream(audioTracks)
-            const source = audioContext.createMediaStreamSource(audioOnlyStream)
-            source.connect(audioDestination)
+        const AudioContextClass = window.AudioContext || window.webkitAudioContext
+        if (AudioContextClass) {
+          audioContext = new AudioContextClass()
+          const destination = audioContext.createMediaStreamDestination()
+          for (const video of [main, overlay].filter(Boolean)) {
+            const capture = video.captureStream || video.mozCaptureStream
+            if (!capture) continue
+            const audioTracks = capture.call(video).getAudioTracks()
+            if (!audioTracks.length) continue
+            const source = audioContext.createMediaStreamSource(new MediaStream(audioTracks))
+            source.connect(destination)
             audioSources.push(source)
-          })
-          if (audioDestination.stream.getAudioTracks().length) {
-            audioDestination.stream.getAudioTracks().forEach(track => stream.addTrack(track))
+          }
+          if (destination.stream.getAudioTracks().length) {
+            destination.stream.getAudioTracks().forEach(track => stream.addTrack(track))
             await audioContext.resume()
           }
         }
       } catch (audioError) {
-        console.warn('No se pudo mezclar el audio de ambas capas:', audioError)
+        console.warn('No se pudo mezclar el audio; se exportará el video:', audioError)
       }
+
       const mime = MediaRecorder.isTypeSupported('video/webm;codecs=vp9,opus')
         ? 'video/webm;codecs=vp9,opus'
-        : (MediaRecorder.isTypeSupported('video/webm;codecs=vp8,opus') ? 'video/webm;codecs=vp8,opus' : 'video/webm')
-      const recorder = new MediaRecorder(stream, {
-        mimeType: mime,
-        videoBitsPerSecond: 20000000,
-        audioBitsPerSecond: 320000
+        : (MediaRecorder.isTypeSupported('video/webm;codecs=vp8,opus')
+          ? 'video/webm;codecs=vp8,opus'
+          : (MediaRecorder.isTypeSupported('video/webm') ? 'video/webm' : ''))
+      recorder = new MediaRecorder(stream, {
+        ...(mime ? { mimeType: mime } : {}),
+        videoBitsPerSecond: 12000000,
+        audioBitsPerSecond: 192000
       })
       recorderRef.current = recorder
       chunksRef.current = []
-      recorder.ondataavailable = event => { if (event.data.size) chunksRef.current.push(event.data) }
+
+      recorder.ondataavailable = event => {
+        if (event.data && event.data.size > 0) chunksRef.current.push(event.data)
+      }
+      recorder.onerror = () => {
+        setMessage('El navegador interrumpió la exportación. Prueba de nuevo con Chrome actualizado.')
+        if (recorder.state !== 'inactive') recorder.stop()
+      }
       recorder.onstop = () => {
-        const blob = new Blob(chunksRef.current, { type: 'video/webm' })
-        const downloadUrl = URL.createObjectURL(blob)
-        const link = document.createElement('a')
-        link.href = downloadUrl
-        link.download = 'Gato-tv-reaccion.webm'
-        link.click()
-        setTimeout(() => URL.revokeObjectURL(downloadUrl), 60000)
+        const blob = new Blob(chunksRef.current, { type: recorder.mimeType || 'video/webm' })
+        if (!blob.size) {
+          setMessage('NINA no recibió datos del video. Comprueba que el video se reproduzca y vuelve a exportar.')
+        } else {
+          const downloadUrl = URL.createObjectURL(blob)
+          const link = document.createElement('a')
+          link.href = downloadUrl
+          link.download = 'Gato-tv-reaccion.webm'
+          link.style.display = 'none'
+          document.body.appendChild(link)
+          link.click()
+          link.remove()
+          window.setTimeout(() => URL.revokeObjectURL(downloadUrl), 120000)
+          setMessage('¡Exportación terminada! Se descargó Gato-tv-reaccion.webm con la firma Gato-tv.')
+        }
         setExporting(false)
         setPlaying(false)
-        setMessage('¡Video de reacción exportado! Se descargó Gato-tv-reaccion.webm. Firma Gato-tv incluida.')
-        stream.getTracks().forEach(track => track.stop())
-        audioSources.forEach(source => source.disconnect())
-        audioContext?.close().catch(() => {})
+        stream?.getTracks().forEach(track => track.stop())
+        cleanAudio()
+        recorderRef.current = null
       }
-      recorder.start(250)
-      setExporting(true)
-      setMessage('Exportando tu reacción en tiempo real. No cierres esta página.')
-      await main.play()
-      if (overlayRef.current) await overlayRef.current.play().catch(() => {})
-      setPlaying(true)
-      main.onended = () => {
+
+      endedHandler = () => {
         if (recorder.state !== 'inactive') recorder.stop()
-        overlayRef.current?.pause()
-        main.onended = null
+        overlay?.pause()
+        setPlaying(false)
       }
+      main.addEventListener('ended', endedHandler, { once: true })
+      recorder.start(1000)
+      setExporting(true)
+      setMessage('Exportando tu reacción. Espera a que termine el video o pulsa Detener exportación.')
+      await main.play()
+      if (overlay) await overlay.play().catch(() => {
+        setMessage('El video principal se está exportando, pero no se pudo iniciar el audio/video de reacción.')
+      })
+      setPlaying(true)
     } catch (error) {
-      setExporting(false)
+      if (endedHandler) main.removeEventListener('ended', endedHandler)
+      if (recorder && recorder.state !== 'inactive') {
+        try { recorder.stop() } catch {}
+      } else {
+        stream?.getTracks().forEach(track => track.stop())
+        cleanAudio()
+        setExporting(false)
+      }
+      setPlaying(false)
       setMessage('No se pudo exportar: ' + (error?.message || 'error del navegador'))
     }
   }
