@@ -453,18 +453,36 @@ def dub_and_render_reaction(
                 srt.write(f"{index}\n{srt_timestamp(item['start'])} --> {srt_timestamp(item['end'])}\n{safe_text}\n\n")
 
         output_path = WORK_DIR / f"nina-doblado-{job_id}.mp4"
+        probe = subprocess.run([ffmpeg, "-i", str(main_path)], capture_output=True, text=True, timeout=30, check=False)
+        duration_match = re.search(r"Duration: (\\d+):(\\d+):(\\d+(?:\\.\\d+)?)", probe.stderr or "")
+        if not duration_match:
+            raise RuntimeError("No se pudo leer la duración del video principal.")
+        video_duration = int(duration_match.group(1)) * 3600 + int(duration_match.group(2)) * 60 + float(duration_match.group(3))
+        silence_path = job_dir / "silence.wav"
+        with wave.open(str(silence_path), "wb") as silence:
+            silence.setnchannels(2)
+            silence.setsampwidth(2)
+            silence.setframerate(48000)
+            remaining = int(video_duration * 48000)
+            block = b"\\x00" * (48000 * 2 * 2)
+            while remaining > 0:
+                frames = min(remaining, 48000)
+                silence.writeframesraw(block[:frames * 4])
+                remaining -= frames
         command = [
             ffmpeg, "-y", "-i", str(main_path), "-i", str(reaction_path)
         ]
         for item in all_segments:
             command.extend(["-i", str(item["audio"])])
+        silence_input_index = len(all_segments) + 2
+        command.extend(["-i", str(silence_path)])
         width = int(1920 * overlay_size / 100)
         x_expr = f"main_w*{overlay_x / 100:.4f}"
         y_expr = f"main_h*{overlay_y / 100:.4f}"
         filter_parts = [
             "[0:v]scale=1920:1080:force_original_aspect_ratio=decrease,pad=1920:1080:(ow-iw)/2:(oh-ih)/2[base]",
             f"[1:v]scale={width}:-2[reaction]",
-            f"[base][reaction]overlay=x={x_expr}:y={y_expr}:shortest=1[vraw]",
+            f"[base][reaction]overlay=x={x_expr}:y={y_expr}:eof_action=pass:shortest=0[vraw]",
         ]
         if subtitles:
             # Relative filename avoids Windows drive-letter escaping in FFmpeg filters.
@@ -478,7 +496,8 @@ def dub_and_render_reaction(
             delay = max(0, int(item["start"] * 1000))
             filter_parts.append(f"[{input_index}:a]aresample=48000,adelay={delay}|{delay}[{label}]")
             audio_labels.append(f"[{label}]")
-        filter_parts.append("".join(audio_labels) + f"amix=inputs={len(audio_labels)}:duration=longest:normalize=0[dub]")
+        filter_parts.append(f"[{silence_input_index}:a]aresample=48000[bed]")
+        filter_parts.append("".join(audio_labels) + "[bed]" + f"amix=inputs={len(audio_labels) + 1}:duration=longest:normalize=0[dub]")
         command.extend([
             "-filter_complex", ";".join(filter_parts),
             "-map", "[vout]", "-map", "[dub]",
