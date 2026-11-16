@@ -1,4 +1,4 @@
-const CACHE = 'nina-shell-v2';
+const CACHE = 'nina-shell-v3';
 const BASE = '/nina/';
 const CORE = [BASE, BASE + 'manifest.webmanifest', BASE + 'icons/nina-192.svg', BASE + 'icons/nina-512.svg'];
 self.addEventListener('install', event => {
