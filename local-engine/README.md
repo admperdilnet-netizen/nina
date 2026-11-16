@@ -38,3 +38,20 @@ Los vídeos recibidos se guardan en `local-engine/work`. El usuario debe borrar 
 La integración experimental de avatar local está documentada en [AVATAR-ENGINE.md](AVATAR-ENGINE.md). Para activarla, instala SadTalker en un entorno Python 3.8 separado, instala Piper en el entorno `.venv` del motor NINA y configura las rutas copiando `AVATAR-LOCAL-CONFIG.example.bat` a `AVATAR-LOCAL-CONFIG.bat`.
 
 La aplicación mantiene D-ID disponible hasta que se pruebe el resultado local. Consulta `http://127.0.0.1:8765/avatar/status` para comprobar si están instalados SadTalker, sus checkpoints, Piper y las voces.
+
+
+## Doblaje automático y subtítulos
+
+La aplicación web incluye el panel **Doblaje y subtítulos automáticos**. Con el motor local abierto, carga el video principal y el video de reacción, elige español, inglés, francés o portugués y pulsa **Doblar y crear subtítulos**.
+
+El motor:
+- Transcribe el diálogo de cada video con Faster-Whisper (modelo small en CPU).
+- Traduce el texto al idioma elegido.
+- Genera una voz neuronal para cada fragmento con Edge TTS.
+- Crea subtítulos traducidos y los incorpora al MP4.
+- Mezcla solamente las voces dobladas; no conserva el audio original.
+- Mantiene la duración del video principal y la superposición de reacción.
+
+La primera ejecución instala las dependencias mediante `INICIAR-NINA.bat` y descarga el modelo Whisper al comenzar el primer doblaje. Se necesita conexión a internet para descargar el modelo y usar los servicios de traducción y voz de Edge TTS. El procesamiento de reconocimiento y montaje se realiza en el PC y puede tardar varios minutos según la duración del video y la potencia del equipo.
+
+Los subtítulos quedan incrustados en la imagen del MP4 final. Por ahora la selección de idioma es común a los dos videos y ambos doblajes usan la voz configurada para ese idioma.
