@@ -5,6 +5,9 @@ import shutil
 import subprocess
 import sys
 import uuid
+import asyncio
+import re
+import wave
 from pathlib import Path
 from typing import Any
 
@@ -12,6 +15,9 @@ import imageio_ffmpeg
 import psutil
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse
+from faster_whisper import WhisperModel
+import edge_tts
+from deep_translator import GoogleTranslator
 from fastapi.middleware.cors import CORSMiddleware
 
 APP_DIR = Path(__file__).resolve().parent
@@ -335,3 +341,189 @@ def play_local_avatar(job_id: str) -> FileResponse:
     if not path.is_file():
         raise HTTPException(status_code=404, detail="No se encontró el vídeo generado.")
     return FileResponse(path, media_type="video/mp4", filename="nina-" + job_id[:8] + ".mp4")
+
+
+# Automatic speech translation, dubbing and subtitles for reaction videos.
+DUB_LANGUAGES = {
+    "es": ("Spanish", "es-MX-DaliaNeural"),
+    "en": ("English", "en-US-JennyNeural"),
+    "fr": ("French", "fr-FR-DeniseNeural"),
+    "pt": ("Portuguese", "pt-BR-FranciscaNeural"),
+}
+_WHISPER_MODEL = None
+
+
+def get_whisper_model():
+    global _WHISPER_MODEL
+    if _WHISPER_MODEL is None:
+        # CPU/int8 keeps memory use manageable on ordinary Windows PCs.
+        _WHISPER_MODEL = WhisperModel("small", device="cpu", compute_type="int8", cpu_threads=2)
+    return _WHISPER_MODEL
+
+
+def srt_timestamp(seconds: float) -> str:
+    milliseconds = max(0, int(seconds * 1000))
+    hours, remainder = divmod(milliseconds, 3_600_000)
+    minutes, remainder = divmod(remainder, 60_000)
+    secs, millis = divmod(remainder, 1000)
+    return f"{hours:02}:{minutes:02}:{secs:02},{millis:03}"
+
+
+async def make_tts(text: str, voice: str, output_path: Path):
+    await edge_tts.Communicate(text, voice).save(str(output_path))
+
+
+def translate_video_segments(video_path: Path, target_language: str, work_dir: Path, prefix: str):
+    model = get_whisper_model()
+    segments, info = model.transcribe(str(video_path), vad_filter=True, beam_size=1)
+    translator = GoogleTranslator(source="auto", target=target_language)
+    translated = []
+    for segment in segments:
+        source_text = (segment.text or "").strip()
+        if not source_text:
+            continue
+        try:
+            translated_text = translator.translate(source_text)
+        except Exception as exc:
+            raise RuntimeError(f"No se pudo traducir el diálogo ({prefix}): {exc}") from exc
+        if not translated_text:
+            continue
+        audio_path = work_dir / f"{prefix}_{len(translated)}.mp3"
+        try:
+            asyncio.run(make_tts(translated_text, DUB_LANGUAGES[target_language][1], audio_path))
+        except Exception as exc:
+            raise RuntimeError(f"No se pudo generar la voz doblada ({prefix}): {exc}") from exc
+        translated.append({
+            "start": max(0.0, float(segment.start)),
+            "end": max(float(segment.start) + 0.1, float(segment.end)),
+            "text": translated_text,
+            "audio": audio_path,
+        })
+    return translated
+
+
+@app.post("/dub-render")
+def dub_and_render_reaction(
+    main_video: UploadFile = File(...),
+    reaction_video: UploadFile = File(...),
+    language: str = Form("es"),
+    overlay_x: float = Form(66),
+    overlay_y: float = Form(60),
+    overlay_size: float = Form(30),
+    subtitles: bool = Form(True),
+):
+    if language not in DUB_LANGUAGES:
+        raise HTTPException(status_code=400, detail="Idioma de doblaje no admitido.")
+    overlay_x = max(0.0, min(100.0, overlay_x))
+    overlay_y = max(0.0, min(100.0, overlay_y))
+    overlay_size = max(12.0, min(65.0, overlay_size))
+    job_id = uuid.uuid4().hex
+    job_dir = WORK_DIR / f"dub_{job_id}"
+    job_dir.mkdir(parents=True, exist_ok=False)
+    main_path = job_dir / ("main" + (Path(main_video.filename or "main.mp4").suffix or ".mp4"))
+    reaction_path = job_dir / ("reaction" + (Path(reaction_video.filename or "reaction.mp4").suffix or ".mp4"))
+    try:
+        for upload, target in ((main_video, main_path), (reaction_video, reaction_path)):
+            total = 0
+            with target.open("wb") as out:
+                while chunk := upload.file.read(UPLOAD_CHUNK_BYTES):
+                    total += len(chunk)
+                    if total > MAX_UPLOAD_BYTES:
+                        raise HTTPException(status_code=413, detail="Uno de los videos supera el límite de 4 GB.")
+                    out.write(chunk)
+            if total == 0:
+                raise HTTPException(status_code=400, detail="Uno de los videos está vacío.")
+    finally:
+        main_video.file.close()
+        reaction_video.file.close()
+
+    ffmpeg = ffmpeg_path()
+    if not ffmpeg:
+        raise HTTPException(status_code=503, detail="FFmpeg no está disponible en el motor local.")
+    try:
+        main_segments = translate_video_segments(main_path, language, job_dir, "main")
+        reaction_segments = translate_video_segments(reaction_path, language, job_dir, "reaction")
+        all_segments = sorted(main_segments + reaction_segments, key=lambda item: item["start"])
+        if not all_segments:
+            raise RuntimeError("No se detectó voz en ninguno de los videos. Comprueba que tengan diálogo audible.")
+        srt_path = job_dir / "subtitles.srt"
+        with srt_path.open("w", encoding="utf-8-sig") as srt:
+            for index, item in enumerate(all_segments, 1):
+                safe_text = re.sub(r"\s+", " ", item["text"]).replace("-->", "→")
+                srt.write(f"{index}\n{srt_timestamp(item['start'])} --> {srt_timestamp(item['end'])}\n{safe_text}\n\n")
+
+        output_path = WORK_DIR / f"nina-doblado-{job_id}.mp4"
+        command = [
+            ffmpeg, "-y", "-i", str(main_path), "-i", str(reaction_path)
+        ]
+        for item in all_segments:
+            command.extend(["-i", str(item["audio"])])
+        width = int(1920 * overlay_size / 100)
+        x_expr = f"main_w*{overlay_x / 100:.4f}"
+        y_expr = f"main_h*{overlay_y / 100:.4f}"
+        filter_parts = [
+            "[0:v]scale=1920:1080:force_original_aspect_ratio=decrease,pad=1920:1080:(ow-iw)/2:(oh-ih)/2[base]",
+            f"[1:v]scale={width}:-2[reaction]",
+            f"[base][reaction]overlay=x={x_expr}:y={y_expr}:shortest=1[vraw]",
+        ]
+        if subtitles:
+            # Relative filename avoids Windows drive-letter escaping in FFmpeg filters.
+            filter_parts.append("[vraw]subtitles=filename=subtitles.srt:force_style='FontName=Arial,FontSize=22,PrimaryColour=&H00FFFFFF,OutlineColour=&H00000000,BorderStyle=1,Outline=2,Shadow=1,Alignment=2,MarginV=42'[vout]")
+        else:
+            filter_parts.append("[vraw]null[vout]")
+        audio_labels = []
+        for index, item in enumerate(all_segments):
+            input_index = index + 2
+            label = f"dub{index}"
+            delay = max(0, int(item["start"] * 1000))
+            filter_parts.append(f"[{input_index}:a]aresample=48000,adelay={delay}|{delay}[{label}]")
+            audio_labels.append(f"[{label}]")
+        filter_parts.append("".join(audio_labels) + f"amix=inputs={len(audio_labels)}:duration=longest:normalize=0[dub]")
+        command.extend([
+            "-filter_complex", ";".join(filter_parts),
+            "-map", "[vout]", "-map", "[dub]",
+            "-c:v", "libx264", "-preset", "veryfast", "-crf", "19",
+            "-r", "30", "-pix_fmt", "yuv420p",
+            "-c:a", "aac", "-b:a", "192k",
+            "-shortest", "-movflags", "+faststart",
+            str(output_path),
+        ])
+        rendered = subprocess.run(command, cwd=str(job_dir), capture_output=True, text=True, timeout=7200, check=False)
+        if rendered.returncode != 0 or not output_path.is_file() or output_path.stat().st_size == 0:
+            raise RuntimeError((rendered.stderr or "FFmpeg no pudo crear el video doblado.")[-1800:])
+        return {
+            "ok": True,
+            "job_id": job_id,
+            "video_url": f"http://127.0.0.1:8765/dub-play/{job_id}",
+            "download_url": f"http://127.0.0.1:8765/dub-download/{job_id}",
+            "language": language,
+            "subtitles_burned_in": bool(subtitles),
+            "original_audio_removed": True,
+            "message": "Doblaje y subtítulos generados. El audio original se ha eliminado.",
+        }
+    except subprocess.TimeoutExpired:
+        raise HTTPException(status_code=504, detail="El doblaje tardó demasiado. Prueba con videos más cortos.")
+    except RuntimeError as exc:
+        raise HTTPException(status_code=500, detail=str(exc)[:1800])
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail="No se pudo completar el doblaje: " + str(exc)[:1200])
+
+
+@app.get("/dub-play/{job_id}")
+def play_dubbed_video(job_id: str) -> FileResponse:
+    if not job_id or any(ch not in "0123456789abcdef" for ch in job_id.lower()):
+        raise HTTPException(status_code=400, detail="Identificador no válido.")
+    path = WORK_DIR / f"nina-doblado-{job_id}.mp4"
+    if not path.is_file():
+        raise HTTPException(status_code=404, detail="No se encontró el video doblado.")
+    return FileResponse(path, media_type="video/mp4")
+
+
+@app.get("/dub-download/{job_id}")
+def download_dubbed_video(job_id: str) -> FileResponse:
+    if not job_id or any(ch not in "0123456789abcdef" for ch in job_id.lower()):
+        raise HTTPException(status_code=400, detail="Identificador no válido.")
+    path = WORK_DIR / f"nina-doblado-{job_id}.mp4"
+    if not path.is_file():
+        raise HTTPException(status_code=404, detail="No se encontró el video doblado.")
+    return FileResponse(path, media_type="video/mp4", filename="NINA-video-doblado.mp4")
