@@ -299,18 +299,16 @@ export default function App() {
       main.pause()
       overlay?.pause()
       setMessage('Preparando los videos y el sonido…')
-      if (main.readyState < 2) await waitFor(main, 'loadeddata', 20000, 'El video principal no terminó de cargar. Prueba con MP4 H.264.')
-      if (overlay && overlay.readyState < 2) await waitFor(overlay, 'loadeddata', 20000, 'El video de reacción no terminó de cargar. Prueba con MP4 H.264.')
-      if (main.currentTime > 0.05) {
-        const seeked = waitFor(main, 'seeked', 10000, 'El video principal no pudo volver al inicio.')
-        main.currentTime = 0
-        await seeked
+
+      // On iPhone Safari, play() must be called directly in the user's tap.
+      // Do not await loadeddata/seeked first: that loses the transient gesture
+      // and Safari then rejects the second (reaction) video.
+      try { main.currentTime = 0 } catch {}
+      if (overlay) {
+        try { overlay.currentTime = 0 } catch {}
       }
-      if (overlay && overlay.currentTime > 0.05) {
-        const seeked = waitFor(overlay, 'seeked', 10000, 'El video de reacción no pudo volver al inicio.')
-        overlay.currentTime = 0
-        await seeked
-      }
+      const mainPlayPromise = main.play()
+      const overlayPlayPromise = overlay ? overlay.play() : Promise.resolve()
 
       setMessage('Iniciando la grabación de tu reacción…')
       stream = canvas.captureStream(30)
@@ -330,7 +328,7 @@ export default function App() {
           }
           if (destination.stream.getAudioTracks().length) {
             destination.stream.getAudioTracks().forEach(track => stream.addTrack(track))
-            await audioContext.resume()
+            audioContext.resume().catch(() => {})
           }
         }
       } catch (audioError) {
@@ -390,10 +388,7 @@ export default function App() {
       main.addEventListener('ended', endedHandler, { once: true })
       recorder.start(1000)
       setMessage('Exportando tu reacción. Espera a que termine el video o pulsa Detener exportación.')
-      await main.play()
-      if (overlay) await overlay.play().catch(() => {
-        setMessage('El video principal se está exportando, pero no se pudo iniciar el audio/video de reacción.')
-      })
+      await Promise.all([mainPlayPromise, overlayPlayPromise])
       setPlaying(true)
     } catch (error) {
       if (endedHandler) main.removeEventListener('ended', endedHandler)
