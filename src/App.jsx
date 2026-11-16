@@ -141,46 +141,51 @@ export default function App() {
     }
   }
 
-  async function togglePlayback() {
+  function togglePlayback() {
     const main = mainRef.current
     const overlay = overlayRef.current
     if (!main) {
       setMessage('Primero carga el video principal.')
       return
     }
-    if (main.paused) {
-      try {
-        if (overlay) {
-          if (overlay.readyState < 2) {
-            await new Promise((resolve, reject) => {
-              const timer = window.setTimeout(() => reject(new Error('El video de reacción tardó demasiado en cargar.')), 10000)
-              overlay.addEventListener('loadeddata', () => { window.clearTimeout(timer); resolve() }, { once: true })
-              overlay.addEventListener('error', () => { window.clearTimeout(timer); reject(new Error('No se pudo leer el video de reacción. Prueba con MP4 H.264.')) }, { once: true })
-            })
-          }
-          if (Number.isFinite(overlay.duration)) overlay.currentTime = Math.min(main.currentTime, Math.max(0, overlay.duration - 0.05))
-        }
-        await main.play()
-        if (overlay) {
-          try {
-            await overlay.play()
-            setMessage('Los dos videos están reproduciéndose juntos.')
-          } catch {
-            main.pause()
-            setPlaying(false)
-            setMessage('El video principal puede reproducirse, pero el video de reacción no. Convierte la reacción a MP4 H.264 y vuelve a cargarla.')
-            return
-          }
-        }
-        setPlaying(true)
-      } catch (error) {
-        setMessage(error?.message || 'No se pudo reproducir el video. Comprueba el formato del archivo.')
-      }
-    } else {
+    if (!main.paused) {
       main.pause()
       overlay?.pause()
       setPlaying(false)
+      return
     }
+
+    // iOS Safari may reject play() if it is called after an awaited load event.
+    // Start BOTH media elements synchronously inside this tap to preserve the
+    // user's playback gesture, then handle their promises together.
+    if (overlay && Number.isFinite(overlay.duration) && overlay.duration > 0) {
+      try { overlay.currentTime = Math.min(main.currentTime, Math.max(0, overlay.duration - 0.05)) } catch {}
+    }
+    let mainPromise
+    let overlayPromise
+    try {
+      mainPromise = main.play()
+      overlayPromise = overlay ? overlay.play() : Promise.resolve()
+    } catch (error) {
+      main.pause()
+      overlay?.pause()
+      setPlaying(false)
+      setMessage(error?.message || 'Safari no pudo iniciar los videos. Comprueba que ambos archivos sean compatibles.')
+      return
+    }
+
+    Promise.all([mainPromise, overlayPromise]).then(() => {
+      setPlaying(true)
+      setMessage(overlay ? 'Los dos videos están reproduciéndose juntos.' : 'Video principal reproduciéndose.')
+    }).catch(error => {
+      main.pause()
+      overlay?.pause()
+      setPlaying(false)
+      const code = overlay?.error?.code
+      setMessage(overlay && (code === 4 || overlay.error)
+        ? 'Safari no puede reproducir el video de reacción. Convierte ese archivo a MP4 con H.264 y vuelve a cargarlo.'
+        : (error?.message || 'Safari no pudo iniciar los videos. Toca reproducir de nuevo.'))
+    })
   }
 
   function seek(value) {
@@ -430,8 +435,8 @@ export default function App() {
             <div className="editor-panel">
               <div className="editor-panel-heading"><div><Film size={18}/><div><strong>Vista previa</strong><small>Arrastra el video pequeño para colocarlo donde quieras.</small></div></div><span className="preview-tag">16:9</span></div>
               <div className="reaction-stage" ref={stageRef} onPointerMove={moveDrag} onPointerUp={stopDrag} onPointerCancel={stopDrag} onPointerLeave={stopDrag}>
-                {mainUrl ? <video ref={mainRef} src={mainUrl} playsInline webkit-playsinline="true" controls preload="metadata" style={{ filter: videoFilter }} onLoadedMetadata={e => { setDuration(e.currentTarget.duration || 0); setMessage("Video principal listo para reproducirse.") }} onCanPlay={() => setMessage("Video principal listo para reproducirse.")} onError={e => { const code = e.currentTarget.error?.code; setMessage(code === 4 ? "Safari no reconoce el códec de este video. Convierte el archivo a MP4 H.264 y vuelve a cargarlo." : "Safari no pudo abrir el video. Prueba guardarlo en Archivos y seleccionarlo de nuevo.") }} onTimeUpdate={e => { const time = e.currentTarget.currentTime; setCurrentTime(time); const overlay = overlayRef.current; if (overlay && Number.isFinite(overlay.duration) && Math.abs(overlay.currentTime - time) > 0.35) { try { overlay.currentTime = Math.min(time, Math.max(0, overlay.duration - 0.05)) } catch {} } }} onSeeking={e => { const overlay = overlayRef.current; if (overlay && Number.isFinite(overlay.duration)) { try { overlay.currentTime = Math.min(e.currentTarget.currentTime, Math.max(0, overlay.duration - 0.05)) } catch {} } }} onEnded={() => { overlayRef.current?.pause(); setPlaying(false) }} /> : <button className="stage-empty" onClick={() => mainInput.current?.click()}><Upload size={30}/><strong>Sube el video principal</strong><span>El video que vas a comentar</span></button>}
-                {overlayUrl && <div className={'reaction-overlay ' + (dragging ? 'dragging' : '')} style={{ left: overlayX + '%', top: overlayY + '%', width: overlaySize + '%', opacity: overlayOpacity / 100 }} onPointerDown={startDrag}><video ref={overlayRef} src={overlayUrl} playsInline webkit-playsinline="true" muted={false} preload="metadata" style={{ filter: videoFilter }} onLoadedMetadata={e => { const main = mainRef.current; if (main && Number.isFinite(e.currentTarget.duration)) { try { e.currentTarget.currentTime = Math.min(main.currentTime, Math.max(0, e.currentTarget.duration - 0.05)) } catch {} } }} onError={() => setMessage('No se pudo cargar el video de reacción. Usa MP4 H.264 para mayor compatibilidad.')}/><span><Move size={12}/> TU REACCIÓN</span></div>}
+                {mainUrl ? <video ref={mainRef} src={mainUrl} playsInline webkit-playsinline="true" controls preload="metadata" style={{ filter: videoFilter }} onLoadedMetadata={e => { setDuration(e.currentTarget.duration || 0); setMessage("Video principal listo para reproducirse.") }} onCanPlay={() => setMessage("Video principal listo para reproducirse.")} onError={e => { const code = e.currentTarget.error?.code; setMessage(code === 4 ? "Safari no reconoce el códec de este video. Convierte el archivo a MP4 H.264 y vuelve a cargarlo." : "Safari no pudo abrir el video. Prueba guardarlo en Archivos y seleccionarlo de nuevo.") }} onTimeUpdate={e => { const time = e.currentTarget.currentTime; setCurrentTime(time); const overlay = overlayRef.current; if (overlay && Number.isFinite(overlay.duration) && Math.abs(overlay.currentTime - time) > 0.6) { try { overlay.currentTime = Math.min(time, Math.max(0, overlay.duration - 0.05)) } catch {} } }} onSeeking={e => { const overlay = overlayRef.current; if (overlay && Number.isFinite(overlay.duration)) { try { overlay.currentTime = Math.min(e.currentTarget.currentTime, Math.max(0, overlay.duration - 0.05)) } catch {} } }} onEnded={() => { overlayRef.current?.pause(); setPlaying(false) }} /> : <button className="stage-empty" onClick={() => mainInput.current?.click()}><Upload size={30}/><strong>Sube el video principal</strong><span>El video que vas a comentar</span></button>}
+                {overlayUrl && <div className={'reaction-overlay ' + (dragging ? 'dragging' : '')} style={{ left: overlayX + '%', top: overlayY + '%', width: overlaySize + '%', opacity: overlayOpacity / 100 }} onPointerDown={startDrag}><video ref={overlayRef} src={overlayUrl} playsInline webkit-playsinline="true" muted={false} preload="auto" style={{ filter: videoFilter }} onLoadedMetadata={e => { const main = mainRef.current; if (main && Number.isFinite(e.currentTarget.duration)) { try { e.currentTarget.currentTime = Math.min(main.currentTime, Math.max(0, e.currentTarget.duration - 0.05)) } catch {} } }} onError={() => setMessage('No se pudo cargar el video de reacción. Usa MP4 H.264 para mayor compatibilidad.')}/><span><Move size={12}/> TU REACCIÓN</span></div>}
                 {!overlayUrl && mainUrl && <button className="add-overlay-hint" onClick={() => overlayInput.current?.click()}><Upload size={17}/> Añadir video de reacción</button>}
               </div>
               <div className="editor-transport">
