@@ -428,18 +428,7 @@ export default function App() {
             </div>
           </section>
           <aside className="editor-sidebar">
-            <section className="editor-panel controls-panel">
-              <div className="editor-panel-heading"><div><Move size={18}/><div><strong>Editar superposición</strong><small>Selecciona y ajusta tu reacción</small></div></div></div>
-              {overlayUrl ? <>
-                <label className="control-label"><span>Tamaño del video</span><b>{overlaySize}%</b><input type="range" min="12" max="65" value={overlaySize} onChange={e => setOverlaySize(Number(e.target.value))}/></label>
-                <label className="control-label"><span>Transparencia</span><b>{overlayOpacity}%</b><input type="range" min="20" max="100" value={overlayOpacity} onChange={e => setOverlayOpacity(Number(e.target.value))}/></label>
-                <div className="control-label"><span>Posición rápida</span><div className="position-grid"><button onClick={() => {setOverlayX(4);setOverlayY(5)}}>↖</button><button onClick={() => {setOverlayX(66);setOverlayY(5)}}>↗</button><button onClick={() => {setOverlayX(4);setOverlayY(60)}}>↙</button><button onClick={() => {setOverlayX(66);setOverlayY(60)}}>↘</button></div></div>
-              </> : <div className="control-empty">Carga el segundo video para habilitar los controles de superposición.</div>}
-              <div className="audio-heading"><Volume2 size={16}/> Mezcla de audio</div>
-              <label className="control-label"><span>Video principal</span><b>{mainVolume}%</b><input type="range" min="0" max="100" value={mainVolume} onChange={e => setMainVolume(Number(e.target.value))}/></label>
-              <label className="control-label"><span>Video de reacción</span><b>{overlayVolume}%</b><input type="range" min="0" max="100" value={overlayVolume} onChange={e => setOverlayVolume(Number(e.target.value))}/></label>
-            </section>
-            <section className="editor-panel filters-panel">
+            <section className="editor-panel filters-panel filters-panel-featured">
               <div className="editor-panel-heading"><div><Film size={18}/><div><strong>Filtros y efectos</strong><small>Elige un estilo y ajusta la imagen</small></div></div></div>
               <label className="control-label"><span>Estilo</span>
                 <select value={filterPreset} onChange={e => {
@@ -467,6 +456,18 @@ export default function App() {
               <label className="control-label"><span>Desenfoque</span><b>{filterBlur}px</b><input type="range" min="0" max="5" step="0.5" value={filterBlur} onChange={e => {setFilterBlur(Number(e.target.value));setFilterPreset('personalizado')}}/></label>
               <button className="layer-add" style={{width:'100%',justifyContent:'center'}} onClick={() => {setFilterPreset('normal');setFilterBrightness(100);setFilterContrast(100);setFilterSaturation(100);setFilterSepia(0);setFilterBlur(0)}}>Restablecer filtros</button>
             </section>
+            <section className="editor-panel controls-panel">
+              <div className="editor-panel-heading"><div><Move size={18}/><div><strong>Editar superposición</strong><small>Selecciona y ajusta tu reacción</small></div></div></div>
+              {overlayUrl ? <>
+                <label className="control-label"><span>Tamaño del video</span><b>{overlaySize}%</b><input type="range" min="12" max="65" value={overlaySize} onChange={e => setOverlaySize(Number(e.target.value))}/></label>
+                <label className="control-label"><span>Transparencia</span><b>{overlayOpacity}%</b><input type="range" min="20" max="100" value={overlayOpacity} onChange={e => setOverlayOpacity(Number(e.target.value))}/></label>
+                <div className="control-label"><span>Posición rápida</span><div className="position-grid"><button onClick={() => {setOverlayX(4);setOverlayY(5)}}>↖</button><button onClick={() => {setOverlayX(66);setOverlayY(5)}}>↗</button><button onClick={() => {setOverlayX(4);setOverlayY(60)}}>↙</button><button onClick={() => {setOverlayX(66);setOverlayY(60)}}>↘</button></div></div>
+              </> : <div className="control-empty">Carga el segundo video para habilitar los controles de superposición.</div>}
+              <div className="audio-heading"><Volume2 size={16}/> Mezcla de audio</div>
+              <label className="control-label"><span>Video principal</span><b>{mainVolume}%</b><input type="range" min="0" max="100" value={mainVolume} onChange={e => setMainVolume(Number(e.target.value))}/></label>
+              <label className="control-label"><span>Video de reacción</span><b>{overlayVolume}%</b><input type="range" min="0" max="100" value={overlayVolume} onChange={e => setOverlayVolume(Number(e.target.value))}/></label>
+            </section>
+
             <section className="editor-panel dub-panel">
               <div className="editor-panel-heading"><div><Volume2 size={18}/><div><strong>Doblaje y subtítulos automáticos</strong><small>Traduce las voces de los dos videos</small></div></div></div>
               <label className="control-label"><span>Idioma del doblaje</span>
