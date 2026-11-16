@@ -1,2 +1,6 @@
-fastapi==0.115.12\nuvicorn[standard]==0.34.0\npython-multipart==0.0.20\nimageio-ffmpeg==0.6.0\npsutil==6.1.1\n
+fastapi==0.115.12
+uvicorn[standard]==0.34.0
+python-multipart==0.0.20
+imageio-ffmpeg==0.6.0
+psutil==6.1.1
 piper-tts==1.8.0
