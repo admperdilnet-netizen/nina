@@ -8,3 +8,5 @@
 
 /* Keep video effects immediately visible at the top of the editor sidebar. */
 .filters-panel-featured{border-color:#8e6bce;background:linear-gradient(145deg,rgba(48,35,72,.99),rgba(23,19,34,.99));box-shadow:0 0 0 1px #8e6bce33,0 12px 30px #0004}.filters-panel-featured .editor-panel-heading>div>svg{color:#d4b8ff}.filters-panel-featured .editor-panel-heading strong{color:#f4eaff;font-size:14px}.filters-panel-featured .control-label{font-size:11px}.filters-panel-featured select{border-color:#9a7acb;background:#171222;color:#fff}
+
+.export-download-link{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;min-height:42px;margin-top:10px;padding:10px 12px;border:1px solid #77d9a5;border-radius:9px;background:#153b2b;color:#c8ffe0;font-size:11px;font-weight:800;text-decoration:none}.export-download-link:hover{background:#1d503a}
