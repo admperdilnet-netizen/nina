@@ -116,8 +116,8 @@ export default function App() {
 
   function loadFile(file, layer) {
     // iOS Files/Photos can provide an empty or generic MIME type for valid MOV/MP4 files.
-    const videoExtension = /\\.(mp4|m4v|mov|webm|ogv|ogg|3gp|3g2|mkv|avi)$/i.test(file?.name || '')
-    const videoMime = /^video\\//i.test(file?.type || '')
+    const videoExtension = /\.(mp4|m4v|mov|webm|ogv|ogg|3gp|3g2|mkv|avi)$/i.test(file?.name || '')
+    const videoMime = /^video\//i.test(file?.type || '')
     if (!file || (!videoMime && !videoExtension)) {
       setMessage('No pude reconocer ese archivo como video. Prueba con MP4 o MOV.')
       return
