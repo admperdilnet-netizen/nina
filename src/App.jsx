@@ -99,21 +99,42 @@ export default function App() {
 
   async function togglePlayback() {
     const main = mainRef.current
+    const overlay = overlayRef.current
     if (!main) {
       setMessage('Primero carga el video principal.')
       return
     }
     if (main.paused) {
       try {
+        if (overlay) {
+          if (overlay.readyState < 2) {
+            await new Promise((resolve, reject) => {
+              const timer = window.setTimeout(() => reject(new Error('El video de reacción tardó demasiado en cargar.')), 10000)
+              overlay.addEventListener('loadeddata', () => { window.clearTimeout(timer); resolve() }, { once: true })
+              overlay.addEventListener('error', () => { window.clearTimeout(timer); reject(new Error('No se pudo leer el video de reacción. Prueba con MP4 H.264.')) }, { once: true })
+            })
+          }
+          if (Number.isFinite(overlay.duration)) overlay.currentTime = Math.min(main.currentTime, Math.max(0, overlay.duration - 0.05))
+        }
         await main.play()
-        if (overlayRef.current) await overlayRef.current.play().catch(() => {})
+        if (overlay) {
+          try {
+            await overlay.play()
+            setMessage('Los dos videos están reproduciéndose juntos.')
+          } catch {
+            main.pause()
+            setPlaying(false)
+            setMessage('El video principal puede reproducirse, pero el video de reacción no. Convierte la reacción a MP4 H.264 y vuelve a cargarla.')
+            return
+          }
+        }
         setPlaying(true)
-      } catch {
-        setMessage('No se pudo reproducir el video. Comprueba el formato del archivo.')
+      } catch (error) {
+        setMessage(error?.message || 'No se pudo reproducir el video. Comprueba el formato del archivo.')
       }
     } else {
       main.pause()
-      overlayRef.current?.pause()
+      overlay?.pause()
       setPlaying(false)
     }
   }
@@ -240,8 +261,8 @@ export default function App() {
             <div className="editor-panel">
               <div className="editor-panel-heading"><div><Film size={18}/><div><strong>Vista previa</strong><small>Arrastra el video pequeño para colocarlo donde quieras.</small></div></div><span className="preview-tag">16:9</span></div>
               <div className="reaction-stage" ref={stageRef} onPointerMove={moveDrag} onPointerUp={stopDrag} onPointerCancel={stopDrag} onPointerLeave={stopDrag}>
-                {mainUrl ? <video ref={mainRef} src={mainUrl} playsInline preload="auto" onLoadedMetadata={e => setDuration(e.currentTarget.duration || 0)} onTimeUpdate={e => setCurrentTime(e.currentTarget.currentTime)} onEnded={() => { overlayRef.current?.pause(); setPlaying(false) }} /> : <button className="stage-empty" onClick={() => mainInput.current?.click()}><Upload size={30}/><strong>Sube el video principal</strong><span>El video que vas a comentar</span></button>}
-                {overlayUrl && <div className={'reaction-overlay ' + (dragging ? 'dragging' : '')} style={{ left: overlayX + '%', top: overlayY + '%', width: overlaySize + '%', opacity: overlayOpacity / 100 }} onPointerDown={startDrag}><video ref={overlayRef} src={overlayUrl} playsInline muted={false} preload="auto"/><span><Move size={12}/> TU REACCIÓN</span></div>}
+                {mainUrl ? <video ref={mainRef} src={mainUrl} playsInline preload="auto" onLoadedMetadata={e => setDuration(e.currentTarget.duration || 0)} onTimeUpdate={e => { const time = e.currentTarget.currentTime; setCurrentTime(time); const overlay = overlayRef.current; if (overlay && Number.isFinite(overlay.duration) && Math.abs(overlay.currentTime - time) > 0.35) { try { overlay.currentTime = Math.min(time, Math.max(0, overlay.duration - 0.05)) } catch {} } }} onSeeking={e => { const overlay = overlayRef.current; if (overlay && Number.isFinite(overlay.duration)) { try { overlay.currentTime = Math.min(e.currentTarget.currentTime, Math.max(0, overlay.duration - 0.05)) } catch {} } }} onEnded={() => { overlayRef.current?.pause(); setPlaying(false) }} /> : <button className="stage-empty" onClick={() => mainInput.current?.click()}><Upload size={30}/><strong>Sube el video principal</strong><span>El video que vas a comentar</span></button>}
+                {overlayUrl && <div className={'reaction-overlay ' + (dragging ? 'dragging' : '')} style={{ left: overlayX + '%', top: overlayY + '%', width: overlaySize + '%', opacity: overlayOpacity / 100 }} onPointerDown={startDrag}><video ref={overlayRef} src={overlayUrl} playsInline muted={false} preload="auto" onLoadedMetadata={e => { const main = mainRef.current; if (main && Number.isFinite(e.currentTarget.duration)) { try { e.currentTarget.currentTime = Math.min(main.currentTime, Math.max(0, e.currentTarget.duration - 0.05)) } catch {} } }} onError={() => setMessage('No se pudo cargar el video de reacción. Usa MP4 H.264 para mayor compatibilidad.')}/><span><Move size={12}/> TU REACCIÓN</span></div>}
                 {!overlayUrl && mainUrl && <button className="add-overlay-hint" onClick={() => overlayInput.current?.click()}><Upload size={17}/> Añadir video de reacción</button>}
               </div>
               <div className="editor-transport">
