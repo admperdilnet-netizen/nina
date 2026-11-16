@@ -15,7 +15,7 @@ if errorlevel 1 (
 )
 if not exist ".venv\Scripts\python.exe" (
   echo Preparando entorno...
-  py -3 -m venv .venv
+  py -3.11 -m venv .venv
   if errorlevel 1 goto error
 )
 set OMP_NUM_THREADS=1
