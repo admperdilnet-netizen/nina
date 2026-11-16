@@ -454,7 +454,7 @@ def dub_and_render_reaction(
 
         output_path = WORK_DIR / f"nina-doblado-{job_id}.mp4"
         probe = subprocess.run([ffmpeg, "-i", str(main_path)], capture_output=True, text=True, timeout=30, check=False)
-        duration_match = re.search(r"Duration: (\d+):(\d+):(\d+(?:\\.\d+)?)", probe.stderr or "")
+        duration_match = re.search(r"Duration: (\d+):(\d+):(\d+(?:\.\d+)?)", probe.stderr or "")
         if not duration_match:
             raise RuntimeError("No se pudo leer la duración del video principal.")
         video_duration = int(duration_match.group(1)) * 3600 + int(duration_match.group(2)) * 60 + float(duration_match.group(3))
